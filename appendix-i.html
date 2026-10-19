@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>附录一：Lox 语法 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">附录一：Lox 语法<small>A1</small></a></h3>
+
+<ul>
+    <li><a href="#句法文法"><small>A1.1</small> 句法文法</a></li>
+    <li><a href="#词法文法"><small>A1.2</small> 词法文法</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="backmatter.html" title="附录" class="left">&larr;&nbsp;上一</a>
+    <a href="backmatter.html" title="附录">&uarr;&nbsp;返回</a>
+    <a href="appendix-ii.html" title="附录二：生成的语法树类" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="backmatter.html" title="附录" class="prev">←</a>
+<a href="appendix-ii.html" title="附录二：生成的语法树类" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">附录一：Lox 语法<small>A1</small></a></h3>
+
+<ul>
+    <li><a href="#句法文法"><small>A1.1</small> 句法文法</a></li>
+    <li><a href="#词法文法"><small>A1.2</small> 词法文法</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="backmatter.html" title="附录" class="left">&larr;&nbsp;上一</a>
+    <a href="backmatter.html" title="附录">&uarr;&nbsp;返回</a>
+    <a href="appendix-ii.html" title="附录二：生成的语法树类" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">A1</div>
+  <h1>附录一：Lox 语法</h1>
+
+<p>这里是 Lox 的完整文法。介绍语言各个部分的那些章节里都给出了相应的文法规则，而这里把它们汇总
+到一处。</p>
+<h2><a href="#句法文法" id="句法文法"><small>A1&#8202;.&#8202;1</small>句法文法</a></h2>
+<p>句法文法用来把线性的词法单元序列解析成层层嵌套的语法树结构。它从第一条能匹配整个 Lox
+程序（或单条 REPL 输入）的规则开始。</p>
+<div class="codehilite"><pre><span class="i">program</span>        → <span class="i">declaration</span>* <span class="t">EOF</span> ;
+</pre></div>
+<h3><a href="#声明" id="声明"><small>A1&#8202;.&#8202;1&#8202;.&#8202;1</small>声明</a></h3>
+<p>一个程序就是一串声明；声明是那些会绑定新标识符的语句，或者任何其他类型的语句。</p>
+<div class="codehilite"><pre><span class="i">declaration</span>    → <span class="i">classDecl</span>
+               | <span class="i">funDecl</span>
+               | <span class="i">varDecl</span>
+               | <span class="i">statement</span> ;
+
+<span class="i">classDecl</span>      → <span class="s">&quot;class&quot;</span> <span class="t">IDENTIFIER</span> ( <span class="s">&quot;&lt;&quot;</span> <span class="t">IDENTIFIER</span> )?
+                 <span class="s">&quot;{&quot;</span> <span class="i">function</span>* <span class="s">&quot;}&quot;</span> ;
+<span class="i">funDecl</span>        → <span class="s">&quot;fun&quot;</span> <span class="i">function</span> ;
+<span class="i">varDecl</span>        → <span class="s">&quot;var&quot;</span> <span class="t">IDENTIFIER</span> ( <span class="s">&quot;=&quot;</span> <span class="i">expression</span> )? <span class="s">&quot;;&quot;</span> ;
+</pre></div>
+<h3><a href="#语句" id="语句"><small>A1&#8202;.&#8202;1&#8202;.&#8202;2</small>语句</a></h3>
+<p>剩下的语句规则会产生副作用，但不引入绑定。</p>
+<div class="codehilite"><pre><span class="i">statement</span>      → <span class="i">exprStmt</span>
+               | <span class="i">forStmt</span>
+               | <span class="i">ifStmt</span>
+               | <span class="i">printStmt</span>
+               | <span class="i">returnStmt</span>
+               | <span class="i">whileStmt</span>
+               | <span class="i">block</span> ;
+
+<span class="i">exprStmt</span>       → <span class="i">expression</span> <span class="s">&quot;;&quot;</span> ;
+<span class="i">forStmt</span>        → <span class="s">&quot;for&quot;</span> <span class="s">&quot;(&quot;</span> ( <span class="i">varDecl</span> | <span class="i">exprStmt</span> | <span class="s">&quot;;&quot;</span> )
+                           <span class="i">expression</span>? <span class="s">&quot;;&quot;</span>
+                           <span class="i">expression</span>? <span class="s">&quot;)&quot;</span> <span class="i">statement</span> ;
+<span class="i">ifStmt</span>         → <span class="s">&quot;if&quot;</span> <span class="s">&quot;(&quot;</span> <span class="i">expression</span> <span class="s">&quot;)&quot;</span> <span class="i">statement</span>
+                 ( <span class="s">&quot;else&quot;</span> <span class="i">statement</span> )? ;
+<span class="i">printStmt</span>      → <span class="s">&quot;print&quot;</span> <span class="i">expression</span> <span class="s">&quot;;&quot;</span> ;
+<span class="i">returnStmt</span>     → <span class="s">&quot;return&quot;</span> <span class="i">expression</span>? <span class="s">&quot;;&quot;</span> ;
+<span class="i">whileStmt</span>      → <span class="s">&quot;while&quot;</span> <span class="s">&quot;(&quot;</span> <span class="i">expression</span> <span class="s">&quot;)&quot;</span> <span class="i">statement</span> ;
+<span class="i">block</span>          → <span class="s">&quot;{&quot;</span> <span class="i">declaration</span>* <span class="s">&quot;}&quot;</span> ;
+</pre></div>
+<p>注意，<code>block</code> 是一条语句规则，但它也作为非终结符用在另外几条规则里，比如函数体之类的地方。</p>
+<h3><a href="#表达式" id="表达式"><small>A1&#8202;.&#8202;1&#8202;.&#8202;3</small>表达式</a></h3>
+<p>表达式产生值。Lox 有许多一元和二元运算符，优先级各不相同。有些语言的文法不把优先级关系
+直接写进去，而是在别处另外说明。这里我们给每个优先级各用一条规则，把这件事写明白。</p>
+<div class="codehilite"><pre><span class="i">expression</span>     → <span class="i">assignment</span> ;
+
+<span class="i">assignment</span>     → ( <span class="i">call</span> <span class="s">&quot;.&quot;</span> )? <span class="t">IDENTIFIER</span> <span class="s">&quot;=&quot;</span> <span class="i">assignment</span>
+               | <span class="i">logic_or</span> ;
+
+<span class="i">logic_or</span>       → <span class="i">logic_and</span> ( <span class="s">&quot;or&quot;</span> <span class="i">logic_and</span> )* ;
+<span class="i">logic_and</span>      → <span class="i">equality</span> ( <span class="s">&quot;and&quot;</span> <span class="i">equality</span> )* ;
+<span class="i">equality</span>       → <span class="i">comparison</span> ( ( <span class="s">&quot;!=&quot;</span> | <span class="s">&quot;==&quot;</span> ) <span class="i">comparison</span> )* ;
+<span class="i">comparison</span>     → <span class="i">term</span> ( ( <span class="s">&quot;&gt;&quot;</span> | <span class="s">&quot;&gt;=&quot;</span> | <span class="s">&quot;&lt;&quot;</span> | <span class="s">&quot;&lt;=&quot;</span> ) <span class="i">term</span> )* ;
+<span class="i">term</span>           → <span class="i">factor</span> ( ( <span class="s">&quot;-&quot;</span> | <span class="s">&quot;+&quot;</span> ) <span class="i">factor</span> )* ;
+<span class="i">factor</span>         → <span class="i">unary</span> ( ( <span class="s">&quot;/&quot;</span> | <span class="s">&quot;*&quot;</span> ) <span class="i">unary</span> )* ;
+
+<span class="i">unary</span>          → ( <span class="s">&quot;!&quot;</span> | <span class="s">&quot;-&quot;</span> ) <span class="i">unary</span> | <span class="i">call</span> ;
+<span class="i">call</span>           → <span class="i">primary</span> ( <span class="s">&quot;(&quot;</span> <span class="i">arguments</span>? <span class="s">&quot;)&quot;</span> | <span class="s">&quot;.&quot;</span> <span class="t">IDENTIFIER</span> )* ;
+<span class="i">primary</span>        → <span class="s">&quot;true&quot;</span> | <span class="s">&quot;false&quot;</span> | <span class="s">&quot;nil&quot;</span> | <span class="s">&quot;this&quot;</span>
+               | <span class="t">NUMBER</span> | <span class="t">STRING</span> | <span class="t">IDENTIFIER</span> | <span class="s">&quot;(&quot;</span> <span class="i">expression</span> <span class="s">&quot;)&quot;</span>
+               | <span class="s">&quot;super&quot;</span> <span class="s">&quot;.&quot;</span> <span class="t">IDENTIFIER</span> ;
+</pre></div>
+<h3><a href="#辅助规则" id="辅助规则"><small>A1&#8202;.&#8202;1&#8202;.&#8202;4</small>辅助规则</a></h3>
+<p>为了让上面的规则干净一点，有一部分文法被拆成了几条复用的辅助规则。</p>
+<div class="codehilite"><pre><span class="i">function</span>       → <span class="t">IDENTIFIER</span> <span class="s">&quot;(&quot;</span> <span class="i">parameters</span>? <span class="s">&quot;)&quot;</span> <span class="i">block</span> ;
+<span class="i">parameters</span>     → <span class="t">IDENTIFIER</span> ( <span class="s">&quot;,&quot;</span> <span class="t">IDENTIFIER</span> )* ;
+<span class="i">arguments</span>      → <span class="i">expression</span> ( <span class="s">&quot;,&quot;</span> <span class="i">expression</span> )* ;
+</pre></div>
+<h2><a href="#词法文法" id="词法文法"><small>A1&#8202;.&#8202;2</small>词法文法</a></h2>
+<p>词法文法由扫描器用来把字符合并成词法单元。如果说句法文法是<a href="https://en.wikipedia.org/wiki/Context-free_grammar">上下文无关的</a>，
+那么词法文法就是<a href="https://en.wikipedia.org/wiki/Regular_grammar">正则的</a>——注意那里没有任何递归规则。</p>
+<div class="codehilite"><pre><span class="t">NUMBER</span>         → <span class="t">DIGIT</span>+ ( <span class="s">&quot;.&quot;</span> <span class="t">DIGIT</span>+ )? ;
+<span class="t">STRING</span>         → <span class="s">&quot;</span><span class="e">\&quot;</span><span class="s">&quot;</span> &lt;<span class="i">any</span> <span class="i">char</span> <span class="i">except</span> <span class="s">&quot;</span><span class="e">\&quot;</span><span class="s">&quot;</span>&gt;* <span class="s">&quot;</span><span class="e">\&quot;</span><span class="s">&quot;</span> ;
+<span class="t">IDENTIFIER</span>     → <span class="t">ALPHA</span> ( <span class="t">ALPHA</span> | <span class="t">DIGIT</span> )* ;
+<span class="t">ALPHA</span>          → <span class="s">&quot;a&quot;</span> ... <span class="s">&quot;z&quot;</span> | <span class="s">&quot;A&quot;</span> ... <span class="s">&quot;Z&quot;</span> | <span class="s">&quot;_&quot;</span> ;
+<span class="t">DIGIT</span>          → <span class="s">&quot;0&quot;</span> ... <span class="s">&quot;9&quot;</span> ;
+</pre></div>
+
+<footer>
+<a href="appendix-ii.html" class="next">
+  下一章：&ldquo;附录二：生成的语法树类&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

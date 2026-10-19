@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>调用与函数 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">调用与函数<small>24</small></a></h3>
+
+<ul>
+    <li><a href="#函数对象"><small>24.1</small> 函数对象</a></li>
+    <li><a href="#编译成函数对象"><small>24.2</small> 编译成函数对象</a></li>
+    <li><a href="#调用帧"><small>24.3</small> 调用帧</a></li>
+    <li><a href="#函数声明"><small>24.4</small> 函数声明</a></li>
+    <li><a href="#函数调用"><small>24.5</small> 函数调用</a></li>
+    <li><a href="#return-语句"><small>24.6</small> Return 语句</a></li>
+    <li><a href="#原生函数"><small>24.7</small> 原生函数</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="jumping-back-and-forth.html" title="来回跳转" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="closures.html" title="闭包" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="jumping-back-and-forth.html" title="来回跳转" class="prev">←</a>
+<a href="closures.html" title="闭包" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">调用与函数<small>24</small></a></h3>
+
+<ul>
+    <li><a href="#函数对象"><small>24.1</small> 函数对象</a></li>
+    <li><a href="#编译成函数对象"><small>24.2</small> 编译成函数对象</a></li>
+    <li><a href="#调用帧"><small>24.3</small> 调用帧</a></li>
+    <li><a href="#函数声明"><small>24.4</small> 函数声明</a></li>
+    <li><a href="#函数调用"><small>24.5</small> 函数调用</a></li>
+    <li><a href="#return-语句"><small>24.6</small> Return 语句</a></li>
+    <li><a href="#原生函数"><small>24.7</small> 原生函数</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="jumping-back-and-forth.html" title="来回跳转" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="closures.html" title="闭包" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">24</div>
+  <h1>调用与函数</h1>
+
+<blockquote>
+<p>“计算机科学中的任何问题，都可以靠再加一个间接层来解决——唯独‘间接层太多’这个问题除外。”</p>
+<p><cite>——大卫·惠勒</cite></p>
+</blockquote>
+<p>这一章是个野兽。我总想把特性拆成一口能吃下的小块，但有时候你得把整<span name="eat">餐</span>咽下去。我们的下一个任务是函数。我们本可以从只有函数声明开始，但没法调用它们的话这没什么用。我们也可以先做调用，可又没东西可调。而 VM 里支撑这两者所需的全部运行时支持，如果不接到任何看得见的东西上，也没什么回报。所以我们要一次全做完。活儿很多，但做完会很爽。</p>
+<aside name="eat">
+<p>吃——也就是「消耗」——用来比喻一个创造性的动作，本身就挺怪。不过大多数产出「输出」的
+生物学过程，呃，都没那么体面。</p>
+</aside>
+<h2><a href="#函数对象" id="函数对象"><small>24&#8202;.&#8202;1</small>函数对象</a></h2>
+<p>VM 里最有趣的结构性改动围绕着栈展开。我们<strong>已经</strong>有一个栈用来放局部变量和临时值，所以已经
+做了一半。但我们还没有<strong>调用</strong>栈的概念。在取得实质进展之前，得先把这个问题解决掉。不过先
+写点代码吧。我总觉得一动手就会感觉好起来。没有某种函数表示，我们就做不了多少事，所以从这儿
+开始。从 VM 的角度看，函数是什么？</p>
+<p>函数有一个可以执行的函数体，也就是说需要一些字节码。我们可以把整个程序连同它所有的函数
+声明都编译进一个大得不得了的 Chunk 里。每个函数持有一个指针，指向 Chunk 内部自己那段代码
+的第一条指令。</p>
+<p>编译到本地代码大致就是这么做的，最后你会得到一整块实心块的机器码。但对我们的字节码 VM
+来说，可以做得稍微高层一点。我觉得更干净的模型是给每个函数自己的 Chunk。我们还需要一些
+别的元数据，那就干脆现在全塞进一个结构体里。</p>
+<div class="codehilite"><pre class="insert-before">  struct Obj* next;
+};
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>Obj</em> 之后</div>
+<pre class="insert">
+
+<span class="k">typedef</span> <span class="k">struct</span> {
+  <span class="t">Obj</span> <span class="i">obj</span>;
+  <span class="t">int</span> <span class="i">arity</span>;
+  <span class="t">Chunk</span> <span class="i">chunk</span>;
+  <span class="t">ObjString</span>* <span class="i">name</span>;
+} <span class="t">ObjFunction</span>;
+</pre><pre class="insert-after">
+
+struct ObjString {
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>Obj</em> 之后</div>
+
+<p>函数在 Lox 里是一等的，所以它们得是真正的 Lox 对象。于是 ObjFunction 拥有所有对象类型
+共享的那个 Obj 头部。<code>arity</code> 字段存放函数期望的形参个数。除代码块外，我们还存放
+函数的<span name="name">名字</span>。它在报告可读的运行时错误时会派上用场。</p>
+<aside name="name">
+<p>人类似乎并不觉得崩溃转储里的数字字节码偏移有多大启发。</p>
+</aside>
+<p>这是「object」模块第一次需要引用 Chunk，所以我们加一个 include。</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;common.h&quot;
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#include &quot;chunk.h&quot;</span>
+</pre><pre class="insert-after">#include &quot;value.h&quot;
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>和处理字符串时一样，我们定义一些访问器，好让 Lox 函数在 C 里更好用。算是穷人版的面向对象。
+首先，我们声明一个用来创建新 Lox 函数的 C 函数。</p>
+<div class="codehilite"><pre class="insert-before">  uint32_t hash;
+};
+
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjString</em> 之后</div>
+<pre class="insert"><span class="t">ObjFunction</span>* <span class="i">newFunction</span>();
+</pre><pre class="insert-after">ObjString* takeString(char* chars, int length);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjString</em> 之后</div>
+
+<p>实现在这边：</p>
+<div class="codehilite"><div class="source-file"><em>object.c</em><br>
+加在 <em>allocateObject</em>() 之后</div>
+<pre><span class="t">ObjFunction</span>* <span class="i">newFunction</span>() {
+  <span class="t">ObjFunction</span>* <span class="i">function</span> = <span class="a">ALLOCATE_OBJ</span>(<span class="t">ObjFunction</span>, <span class="a">OBJ_FUNCTION</span>);
+  <span class="i">function</span>-&gt;<span class="i">arity</span> = <span class="n">0</span>;
+  <span class="i">function</span>-&gt;<span class="i">name</span> = <span class="a">NULL</span>;
+  <span class="i">initChunk</span>(&amp;<span class="i">function</span>-&gt;<span class="i">chunk</span>);
+  <span class="k">return</span> <span class="i">function</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 加在 <em>allocateObject</em>() 之后</div>
+
+<p>我们用老朋友 <code>ALLOCATE_OBJ()</code> 分配内存并初始化对象头部，好让 VM 知道它是哪种类型的对象。
+我们不像处理 ObjString 那样传入参数来初始化函数，而是把函数置成一种空白状态——元数为零、
+没有名字、没有代码。这些等函数创建好之后再填。</p>
+<p>既然有了新的一类对象，就需要在枚举里加一个新的对象类型。</p>
+<div class="codehilite"><pre class="insert-before">typedef enum {
+</pre><div class="source-file"><em>object.h</em><br>
+在枚举 <em>ObjType</em> 内</div>
+<pre class="insert">  <span class="a">OBJ_FUNCTION</span>,
+</pre><pre class="insert-after">  OBJ_STRING,
+} ObjType;
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在枚举 <em>ObjType</em> 内</div>
+
+<p>当我们用完一个函数对象，必须把它借来的那些位还回操作系统。</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_FUNCTION</span>: {
+      <span class="t">ObjFunction</span>* <span class="i">function</span> = (<span class="t">ObjFunction</span>*)<span class="i">object</span>;
+      <span class="i">freeChunk</span>(&amp;<span class="i">function</span>-&gt;<span class="i">chunk</span>);
+      <span class="a">FREE</span>(<span class="t">ObjFunction</span>, <span class="i">object</span>);
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_STRING: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<p>这个 switch 分支除了释放函数自己，还<span name="free-name">负责</span>释放它拥有的其他任何内存。函数拥有自己的
+代码块，所以我们调用 Chunk 那个类似析构函数的函数。</p>
+<aside name="free-name">
+<p>我们不需要显式释放函数的名字，因为它是个 ObjString。这意味着我们可以让垃圾回收器替我们
+管理它的生命周期。或者至少，等我们<a href="garbage-collection.html">实现垃圾回收器</a>之后可以。</p>
+</aside>
+<p>Lox 允许你打印任何对象，而函数是一等对象，所以我们也得处理它们。</p>
+<div class="codehilite"><pre class="insert-before">  switch (OBJ_TYPE(value)) {
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>printObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_FUNCTION</span>:
+      <span class="i">printFunction</span>(<span class="a">AS_FUNCTION</span>(<span class="i">value</span>));
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_STRING:
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>printObject</em>() 内</div>
+
+<p>它调用了这个：</p>
+<div class="codehilite"><div class="source-file"><em>object.c</em><br>
+加在 <em>copyString</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">printFunction</span>(<span class="t">ObjFunction</span>* <span class="i">function</span>) {
+  <span class="i">printf</span>(<span class="s">&quot;&lt;fn %s&gt;&quot;</span>, <span class="i">function</span>-&gt;<span class="i">name</span>-&gt;<span class="i">chars</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 加在 <em>copyString</em>() 之后</div>
+
+<p>既然函数知道自己的名字，报上姓名也无妨。</p>
+<p>最后，我们有几个把值转成函数的宏。首先，确保你的值<strong>确实</strong>是个函数。</p>
+<div class="codehilite"><pre class="insert-before">#define OBJ_TYPE(value)        (AS_OBJ(value)-&gt;type)
+
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)</span>
+</pre><pre class="insert-after">#define IS_STRING(value)       isObjType(value, OBJ_STRING)
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>假定这里求值为真，你就可以用这个把该 Value 安全地转型成 ObjFunction 指针：</p>
+<div class="codehilite"><pre class="insert-before">#define IS_STRING(value)       isObjType(value, OBJ_STRING)
+
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))</span>
+</pre><pre class="insert-after">#define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>这样一来，我们的对象模型就知道怎么表示函数了。我感觉热起来了。准备好来点更难的吗？</p>
+<h2><a href="#编译成函数对象" id="编译成函数对象"><small>24&#8202;.&#8202;2</small>编译成函数对象</a></h2>
+<p>目前我们的编译器假定自己总是在编译到同一个代码块里。随着每个函数的代码各自住在独立的
+代码块里，这事变复杂了。当编译器碰到一条函数声明时，它需要在编译函数体时把代码发射进那个
+函数的代码块。在函数体的末尾，编译器需要回到它之前在用的那个代码块。</p>
+<p>对函数体内部的代码来说这没问题，但对不在函数体里的代码呢？Lox 程序的「顶层」也是命令式
+代码，我们也需要一个代码块来编译它。我们可以把那层顶层代码也放进一个自动定义的函数里，
+这样就能同时简化编译器和 VM。这样编译器永远处在某个函数体内部，VM 也永远通过调用一个函数
+来运行代码。就好像整个程序都被<span name="wrap">包在</span>一个隐式的 <code>main()</code> 函数里。</p>
+<aside name="wrap">
+<p>这个类比在一处语义上不成立，就是全局变量。它们有一套不同于局部变量的特殊作用域规则，
+所以在这个意义上，脚本的顶层并不像函数体。</p>
+</aside>
+<p>那么在讲到用户定义的函数之前，我们先来做这个重组，以支持那个隐式的顶层函数。它从
+Compiler 结构体开始。它不再直接指向一个供编译器写入的 Chunk，而是持有一个对正在构建的
+函数对象的引用。</p>
+<div class="codehilite"><pre class="insert-before">typedef struct {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在结构体 <em>Compiler</em> 内</div>
+<pre class="insert">  <span class="t">ObjFunction</span>* <span class="i">function</span>;
+  <span class="t">FunctionType</span> <span class="i">type</span>;
+
+</pre><pre class="insert-after">  Local locals[UINT8_COUNT];
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在结构体 <em>Compiler</em> 内</div>
+
+<p>我们还有一个小小的 FunctionType 枚举。这让编译器能分辨自己是在编译顶层代码，还是在编译某个
+函数的函数体。编译器的大部分代码并不关心这个——所以它才是个有用的抽象——但在一两个地方
+这个区别是有意义的。我们后面会碰到一处。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在结构体 <em>Local</em> 之后</div>
+<pre><span class="k">typedef</span> <span class="k">enum</span> {
+  <span class="a">TYPE_FUNCTION</span>,
+  <span class="a">TYPE_SCRIPT</span>
+} <span class="t">FunctionType</span>;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在结构体 <em>Local</em> 之后</div>
+
+<p>编译器里每一处原本在写 Chunk 的地方，现在都得经过那个 <code>function</code> 指针。幸运的是，很多<span
+name="current">章</span>以前，我们就把访问代码块的动作封装进了 <code>currentChunk()</code> 函数。
+我们只需要改它，编译器的其余部分就皆大欢喜了。</p>
+<aside name="current">
+<p>这几乎就像我有一只能看见未来的水晶球，早就知道我们以后会改这段代码。不过说真的，是因为我在
+写这本书的正文之前，已经把全部代码都写完了。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">Compiler* current = NULL;
+</pre><div class="source-file"><em>compiler.c</em><br>
+加在变量 <em>current</em> 之后<br>
+替换 5 行</div>
+<pre class="insert">
+
+<span class="k">static</span> <span class="t">Chunk</span>* <span class="i">currentChunk</span>() {
+  <span class="k">return</span> &amp;<span class="i">current</span>-&gt;<span class="i">function</span>-&gt;<span class="i">chunk</span>;
+}
+</pre><pre class="insert-after">
+
+static void errorAt(Token* token, const char* message) {
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在变量 <em>current</em> 之后, 替换 5 行</div>
+
+<p>当前代码块永远是我们正在编译的那个函数所拥有的代码块。接下来，我们得真的把这个函数创建出来。
+以前 VM 会把一个 Chunk 传给编译器，由编译器往里填代码。现在，改成由编译器创建并返回一个
+函数，里面装着编译好的用户程序顶层代码——这是我们目前唯一支持的。</p>
+<h3><a href="#在编译期创建函数" id="在编译期创建函数"><small>24&#8202;.&#8202;2&#8202;.&#8202;1</small>在编译期创建函数</a></h3>
+<p>我们从 <code>compile()</code> 开始把这件事贯穿下去，它是进入编译器的主入口。</p>
+<div class="codehilite"><pre class="insert-before">  Compiler compiler;
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>compile</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">  <span class="i">initCompiler</span>(&amp;<span class="i">compiler</span>, <span class="a">TYPE_SCRIPT</span>);
+</pre><pre class="insert-after">
+
+  parser.hadError = false;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>compile</em>() 内, 替换 2 行</div>
+
+<p>编译器初始化的方式有一堆改动。首先，初始化新的 Compiler 字段。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+在函数 <em>initCompiler</em>() 内<br>
+替换 1 行</div>
+<pre class="insert"><span class="k">static</span> <span class="t">void</span> <span class="i">initCompiler</span>(<span class="t">Compiler</span>* <span class="i">compiler</span>, <span class="t">FunctionType</span> <span class="i">type</span>) {
+  <span class="i">compiler</span>-&gt;<span class="i">function</span> = <span class="a">NULL</span>;
+  <span class="i">compiler</span>-&gt;<span class="i">type</span> = <span class="i">type</span>;
+</pre><pre class="insert-after">  compiler-&gt;localCount = 0;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在函数 <em>initCompiler</em>() 内, 替换 1 行</div>
+
+<p>然后分配一个新的函数对象，供编译输出进去。</p>
+<div class="codehilite"><pre class="insert-before">  compiler-&gt;scopeDepth = 0;
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>initCompiler</em>() 内</div>
+<pre class="insert">  <span class="i">compiler</span>-&gt;<span class="i">function</span> = <span class="i">newFunction</span>();
+</pre><pre class="insert-after">  current = compiler;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>initCompiler</em>() 内</div>
+
+<p><span name="null"></span></p>
+<aside name="null">
+<p>我知道，把 <code>function</code> 字段置空、几行之后又立刻给它赋值，看起来挺傻。这只是又一层跟垃圾回收
+有关的偏执。</p>
+</aside>
+<p>在编译器里创建 ObjFunction 也许显得有些奇怪。函数对象是函数的<strong>运行时</strong>表示，可我们现在
+是在编译期创建它。理解这件事的方式是：函数有点像字符串或数字字面量。它在编译期世界和运行时
+世界之间架了一座桥。等我们讲到函数<strong>声明</strong>的时候，那些东西<strong>才是</strong>字面量——它们是一种
+产生内建类型值的记法。所以<span name="closure">编译器</span>在编译期间创建函数对象。
+然后到了运行时，只管调用它们。</p>
+<aside name="closure">
+<p>我们之所以能在编译期创建函数，是因为它们只包含编译期就能拿到的数据。函数的代码、名字和
+元数都是固定的。等我们在<a href="closures.html">下一章</a>加入会在运行时捕获变量的闭包，情况就复杂了。</p>
+</aside>
+<p>这里还有一段奇怪的代码：</p>
+<div class="codehilite"><pre class="insert-before">  current = compiler;
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>initCompiler</em>() 内</div>
+<pre class="insert">
+
+  <span class="t">Local</span>* <span class="i">local</span> = &amp;<span class="i">current</span>-&gt;<span class="i">locals</span>[<span class="i">current</span>-&gt;<span class="i">localCount</span>++];
+  <span class="i">local</span>-&gt;<span class="i">depth</span> = <span class="n">0</span>;
+  <span class="i">local</span>-&gt;<span class="i">name</span>.<span class="i">start</span> = <span class="s">&quot;&quot;</span>;
+  <span class="i">local</span>-&gt;<span class="i">name</span>.<span class="i">length</span> = <span class="n">0</span>;
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>initCompiler</em>() 内</div>
+
+<p>记住，编译器的 <code>locals</code> 数组记录着哪些栈槽位对应哪些局部变量或临时值。从现在起，编译器会
+隐式占用 0 号栈槽位供 VM 内部使用。我们给它一个空名字，这样用户就写不出引用它的标识符。
+等它变得有用时我再解释这是怎么回事。</p>
+<p>这就是初始化这一侧。当我们编译完一段代码时，另一端也需要几处改动。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+在函数 <em>endCompiler</em>() 内<br>
+替换 1 行</div>
+<pre class="insert"><span class="k">static</span> <span class="t">ObjFunction</span>* <span class="i">endCompiler</span>() {
+</pre><pre class="insert-after">  emitReturn();
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在函数 <em>endCompiler</em>() 内, 替换 1 行</div>
+
+<p>以前 <code>interpret()</code> 调用编译器时，会传进去一个供写入的 Chunk。既然现在编译器自己创建函数
+对象，我们就返回那个函数。在这里我们从当前编译器把它取出来：</p>
+<div class="codehilite"><pre class="insert-before">  emitReturn();
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>endCompiler</em>() 内</div>
+<pre class="insert">  <span class="t">ObjFunction</span>* <span class="i">function</span> = <span class="i">current</span>-&gt;<span class="i">function</span>;
+
+</pre><pre class="insert-after">#ifdef DEBUG_PRINT_CODE
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>endCompiler</em>() 内</div>
+
+<p>然后这样把它返回给 <code>compile()</code>：</p>
+<div class="codehilite"><pre class="insert-before">#endif
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>endCompiler</em>() 内</div>
+<pre class="insert">
+
+  <span class="k">return</span> <span class="i">function</span>;
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>endCompiler</em>() 内</div>
+
+<p>现在正适合在这个函数里再做一处微调。之前我们加了一些诊断代码，让 VM 把反汇编出来的字节码
+打印出来，好让我们调试编译器。既然生成的代码块现在被包在函数里，就得把它改成继续可用。</p>
+<div class="codehilite"><pre class="insert-before">#ifdef DEBUG_PRINT_CODE
+  if (!parser.hadError) {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>endCompiler</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">    <span class="i">disassembleChunk</span>(<span class="i">currentChunk</span>(), <span class="i">function</span>-&gt;<span class="i">name</span> != <span class="a">NULL</span>
+        ? <span class="i">function</span>-&gt;<span class="i">name</span>-&gt;<span class="i">chars</span> : <span class="s">&quot;&lt;script&gt;&quot;</span>);
+</pre><pre class="insert-after">  }
+#endif
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>endCompiler</em>() 内, 替换 1 行</div>
+
+<p>注意到这里检查函数的名字是不是 <code>NULL</code> 吗？用户定义的函数都有名字，但我们为顶层代码创建的那
+个隐式函数没有，即使在我们自己的诊断代码里也得优雅地处理这种情况。说到诊断代码：</p>
+<div class="codehilite"><pre class="insert-before">static void printFunction(ObjFunction* function) {
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>printFunction</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">function</span>-&gt;<span class="i">name</span> == <span class="a">NULL</span>) {
+    <span class="i">printf</span>(<span class="s">&quot;&lt;script&gt;&quot;</span>);
+    <span class="k">return</span>;
+  }
+</pre><pre class="insert-after">  printf(&quot;&lt;fn %s&gt;&quot;, function-&gt;name-&gt;chars);
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>printFunction</em>() 内</div>
+
+<p><strong>用户</strong>没法拿到顶层函数的引用去打印它，但我们那个打印整个栈的 <code>DEBUG_TRACE_EXECUTION</code> <span name="debug">诊断</span>代码能，而且确实会那么做。</p>
+<aside name="debug">
+<p>要是我们用来找 bug 的诊断代码本身把 VM 搞成段错误，那可就一点都不好玩了！</p>
+</aside>
+<p>上浮一层到 <code>compile()</code>，我们调整它的签名。</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;vm.h&quot;
+
+</pre><div class="source-file"><em>compiler.h</em><br>
+在函数 <em>compile</em>() 内<br>
+替换 1 行</div>
+<pre class="insert"><span class="t">ObjFunction</span>* <span class="i">compile</span>(<span class="k">const</span> <span class="t">char</span>* <span class="i">source</span>);
+</pre><pre class="insert-after">
+
+#endif
+</pre></div>
+<div class="source-file-narrow"><em>compiler.h</em>, 在函数 <em>compile</em>() 内, 替换 1 行</div>
+
+<p>它不再接收代码块，而是返回一个函数。实现那边：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+在函数 <em>compile</em>() 内<br>
+替换 1 行</div>
+<pre class="insert"><span class="t">ObjFunction</span>* <span class="i">compile</span>(<span class="k">const</span> <span class="t">char</span>* <span class="i">source</span>) {
+</pre><pre class="insert-after">  initScanner(source);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在函数 <em>compile</em>() 内, 替换 1 行</div>
+
+<p>终于到了真正的代码。我们把这个函数的最后改成这样：</p>
+<div class="codehilite"><pre class="insert-before">  while (!match(TOKEN_EOF)) {
+    declaration();
+  }
+
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>compile</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">  <span class="t">ObjFunction</span>* <span class="i">function</span> = <span class="i">endCompiler</span>();
+  <span class="k">return</span> <span class="i">parser</span>.<span class="i">hadError</span> ? <span class="a">NULL</span> : <span class="i">function</span>;
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>compile</em>() 内, 替换 2 行</div>
+
+<p>我们从编译器那里拿到函数对象。如果没有编译错误，就返回它。否则，我们返回 <code>NULL</code> 来表示
+错误。这样一来，VM 就不会去执行一个可能含有非法字节码的函数。</p>
+<p>最终我们会把 <code>interpret()</code> 改成适配 <code>compile()</code> 的新声明，但先还有别的改动要做。</p>
+<h2><a href="#调用帧" id="调用帧"><small>24&#8202;.&#8202;3</small>调用帧</a></h2>
+<p>是时候做一次大的概念跳跃了。在实现函数声明和调用之前，得先让 VM 准备好接待它们。有两个
+主要问题需要考虑：</p>
+<h3><a href="#分配局部变量" id="分配局部变量"><small>24&#8202;.&#8202;3&#8202;.&#8202;1</small>分配局部变量</a></h3>
+<p>编译器为局部变量分配栈槽位。当一个程序里的局部变量分散在多个函数中时，这件事该怎么办？</p>
+<p>一种做法是让它们彻底分开。每个函数在 VM 栈里拥有自己专属的一组槽位，<span name="static">永远</span>归它所有，
+哪怕这个函数当前没被调用。整个程序里的每个局部变量都会在 VM 里占一块只属于它自己的内存。</p>
+<aside name="static">
+<p>这基本上就是你在 C 程序里把每个局部变量都用 <code>static</code> 声明时会得到的东西。</p>
+</aside>
+<p>信不信由你，早期的编程语言实现确实是这么干的。最早的 Fortran 编译器为每个变量静态分配内存。
+显而易见的问题是它效率极低。大多数函数在任何时刻都不正处于被调用的状态，所以替它们占着
+用不上的内存纯属浪费。</p>
+<p>不过更根本的问题是递归。有了递归，你可以同时「处于」对同一个函数的多次调用之中。每次调用
+都需要<span name="fortran">自己</span>的内存来放局部变量。在 jlox 里，我们靠每次调用
+函数或进入一个块时都动态分配一份环境内存来解决。在 clox 里，我们不想让每次函数调用都背上
+这种性能开销。</p>
+<aside name="fortran">
+<p>Fortran 干脆完全禁止递归来回避这个问题。在当时，递归被视为一项进阶而深奥的特性。</p>
+</aside>
+<p>我们的做法则落在 Fortran 的静态分配与 jlox 的动态方案之间。VM 的值栈基于这样一个观察：
+局部变量和临时值的行为是后进先出的。幸运的是，即使加上函数调用，这一点依然成立。举个例子：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">first</span>() {
+  <span class="k">var</span> <span class="i">a</span> = <span class="n">1</span>;
+  <span class="i">second</span>();
+  <span class="k">var</span> <span class="i">b</span> = <span class="n">2</span>;
+}
+
+<span class="k">fun</span> <span class="i">second</span>() {
+  <span class="k">var</span> <span class="i">c</span> = <span class="n">3</span>;
+  <span class="k">var</span> <span class="i">d</span> = <span class="n">4</span>;
+}
+
+<span class="i">first</span>();
+</pre></div>
+<p>一步步走过这个程序，看看每个时刻内存里有哪些变量：</p><img src="image/calls-and-functions/calls.png" alt="走一遍上一个程序的执行，展示每一步的变量栈。" />
+<p>执行流经这两次调用时，每个局部变量都遵守这样一条原则：后声明的变量，总是先于先声明的变量被丢弃。这一点跨越调用也成立。我们知道用完 <code>c</code> 和 <code>d</code> 会早于用完 <code>a</code>。
+看来我们确实可以把局部变量分配到 VM 的值栈上。</p>
+<p>理想情况下，我们仍然在编译期决定每个变量会放到栈上的<strong>哪里</strong>。这样操作变量的字节码指令
+才能保持简单快速。在上面那个例子里，我们可以相当直接地<span name="imagine">想象</span>出
+这种做法，但并非总是行得通。考虑：</p>
+<aside name="imagine">
+<p>我说「想象」，是因为编译器其实没法把它算出来。因为函数在 Lox 里是一等的，我们无法在编译期
+确定哪个函数调用哪个函数。</p>
+</aside>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">first</span>() {
+  <span class="k">var</span> <span class="i">a</span> = <span class="n">1</span>;
+  <span class="i">second</span>();
+  <span class="k">var</span> <span class="i">b</span> = <span class="n">2</span>;
+  <span class="i">second</span>();
+}
+
+<span class="k">fun</span> <span class="i">second</span>() {
+  <span class="k">var</span> <span class="i">c</span> = <span class="n">3</span>;
+  <span class="k">var</span> <span class="i">d</span> = <span class="n">4</span>;
+}
+
+<span class="i">first</span>();
+</pre></div>
+<p>在第一次调用 <code>second()</code> 时，<code>c</code> 和 <code>d</code> 会落进 1 号和 2 号槽位。但第二次调用时，我们需要给
+<code>b</code> 腾出位置，所以 <code>c</code> 和 <code>d</code> 得待在 2 号和 3 号槽位。因此编译器无法跨函数调用为每个局部
+变量钉死一个确切的槽位。但在某个函数<strong>内部</strong>，各局部变量的<strong>相对</strong>位置是固定的。
+变量 <code>d</code> 永远紧跟在 <code>c</code> 后面。这就是关键所在。</p>
+<p>函数被调用时，我们不知道栈顶会在哪里，因为它可能从不同的上下文被调用。但不管那个栈顶碰巧
+在哪里，我们都清楚这个函数的所有局部变量相对于那个起点会在哪里。所以，和很多问题一样，
+我们用一层间接来解决分配问题。</p>
+<p>在每次函数调用的开头，VM 记录下该函数自己的局部变量从哪个槽位开始。那些操作局部变量的
+指令，会按相对于这个位置的槽位索引来访问它们，而不是像现在这样相对于栈底。编译期我们算出
+这些相对槽位；运行时我们把相对槽位加上本次函数调用的起始槽位，换算成绝对的栈索引。</p>
+<p>这就像函数在更大的栈里获得了一个「窗口」或「帧」，可以在里面存放自己的局部变量。
+<strong>调用帧</strong>的位置在运行时确定，但在那块区域之内、相对于它，我们知道东西在哪儿。</p><img src="image/calls-and-functions/window.png" alt="second() 被调用时的两个时刻的栈，各有一个窗口悬浮其上，显示该函数使用的两个栈槽位。" />
+<p>这个记录「函数局部变量从何处开始」的位置，其历史名称叫<strong>帧指针</strong>，因为它指向函数调用帧的
+开头。有时你也听人叫它<strong>基址指针</strong>，因为它指向那个「函数所有变量都叠在其上」的基准栈槽位。</p>
+<p>这是我们需要追踪的第一份数据。每次我们调用一个函数，VM 都会确定该函数的变量从哪个栈槽位
+开始。</p>
+<h3><a href="#返回地址" id="返回地址"><small>24&#8202;.&#8202;3&#8202;.&#8202;2</small>返回地址</a></h3>
+<p>目前，VM 是靠递增 <code>ip</code> 字段在指令流中前进的。唯一有意思的行为在控制流指令附近，它们会给
+<code>ip</code> 加上更大的偏移。<strong>调用</strong>一个函数相当直接——只要把 <code>ip</code> 设成指向那个函数代码块中的第一条
+指令就行。但函数执行完之后呢？</p>
+<p>VM 需要<span name="return">返回</span>到调用它的那个代码块，并从紧挨着调用之后的那条
+指令继续执行。所以对每一次函数调用，我们都需要追踪「调用完成时该跳回哪里」。这叫<strong>返回
+地址</strong>，因为它就是 VM 在调用结束后要回到的那条指令的地址。</p>
+<p>同样因为递归，一个函数可能对应多个返回地址，所以这是每次<strong>调用</strong>的属性，而不是函数
+本身的属性。</p>
+<aside name="return">
+<p>早期 Fortran 编译器的作者们实现返回地址用过一个聪明的技巧。既然他们<strong>不</strong>支持递归，任何一个
+函数在任何时刻只需要一个返回地址。于是当一个函数在运行时被调用时，程序会<strong>修改自己的代码</strong>，
+把函数末尾的跳转指令改成跳回它的调用者。有时候天才与疯狂之间只隔着一根头发丝。</p>
+</aside>
+<h3><a href="#调用栈" id="调用栈"><small>24&#8202;.&#8202;3&#8202;.&#8202;3</small>调用栈</a></h3>
+<p>于是，对每一次活着的函数调用——每一次尚未返回的调用——我们都需要追踪该函数的局部变量从
+栈上何处开始，以及调用方该从哪里恢复。我们把这些连同别的东西一起放进一个新结构体。</p>
+<div class="codehilite"><pre class="insert-before">#define STACK_MAX 256
+</pre><div class="source-file"><em>vm.h</em></div>
+<pre class="insert">
+
+<span class="k">typedef</span> <span class="k">struct</span> {
+  <span class="t">ObjFunction</span>* <span class="i">function</span>;
+  <span class="t">uint8_t</span>* <span class="i">ip</span>;
+  <span class="t">Value</span>* <span class="i">slots</span>;
+} <span class="t">CallFrame</span>;
+</pre><pre class="insert-after">
+
+typedef struct {
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em></div>
+
+<p>一个 CallFrame 表示一次进行中的函数调用。<code>slots</code> 字段指向 VM 值栈里这个函数可以使用的第一个
+槽位。我给它起了个复数名字，因为——拜 C 那个古怪的「指针差不多就是数组」特性所赐——我们会
+把它当数组用。</p>
+<p>返回地址的实现和我上面描述的稍有不同。我们不是把返回地址存在被调用方的帧里，而是让调用方
+存下自己的 <code>ip</code>。当我们从一个函数返回时，VM 会跳到调用方 CallFrame 的 <code>ip</code> 并从那里恢复。</p>
+<p>我还把一个指向被调用函数的指针塞在了这里。我们会用它查常量，以及做另外几件事。</p>
+<p>每次函数被调用，我们都创建这样一个结构体。我们本可以在堆上<span name="heap">动态</span>
+分配它们，但那样太慢。函数调用是核心操作，所以必须尽可能快。幸运的是，我们可以做和变量
+那个一样的观察：函数调用具有栈语义。如果 <code>first()</code> 调用了 <code>second()</code>，那么对 <code>second()</code> 的
+调用会在 <code>first()</code> 完成之前完成。</p>
+<aside name="heap">
+<p>很多 Lisp 实现会动态分配栈帧，因为那样实现<a href="https://en.wikipedia.org/wiki/Continuation">延续</a>更简单。如果你的语言支持延续，那么
+函数调用就<strong>不</strong>总是具有栈语义。</p>
+</aside>
+<p>于是，在 VM 那边，我们预先创建一个 CallFrame 结构体数组，把它当成栈来用，就像对值数组做的那样。</p>
+<div class="codehilite"><pre class="insert-before">typedef struct {
+</pre><div class="source-file"><em>vm.h</em><br>
+在结构体 <em>VM</em> 内<br>
+替换 2 行</div>
+<pre class="insert">  <span class="t">CallFrame</span> <span class="i">frames</span>[<span class="a">FRAMES_MAX</span>];
+  <span class="t">int</span> <span class="i">frameCount</span>;
+
+</pre><pre class="insert-after">  Value stack[STACK_MAX];
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em>, 在结构体 <em>VM</em> 内, 替换 2 行</div>
+
+<p>这个数组取代了原先直接放在 VM 里的 <code>chunk</code> 和 <code>ip</code> 字段。现在每个 CallFrame 都有自己的 <code>ip</code>
+和指向它正在执行的 ObjFunction 的指针。从那里我们就能拿到该函数的代码块。</p>
+<p>VM 里新增的 <code>frameCount</code> 字段存放 CallFrame 栈的当前高度——也就是进行中的函数调用数量。为了
+让 clox 保持简单，数组容量是固定的。这意味着，和许多语言实现一样，我们能处理的最大调用
+深度是有限的。对 clox 来说，它定义在这里：</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;value.h&quot;
+
+</pre><div class="source-file"><em>vm.h</em><br>
+替换 1 行</div>
+<pre class="insert"><span class="a">#define FRAMES_MAX 64</span>
+<span class="a">#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)</span>
+</pre><pre class="insert-after">
+
+typedef struct {
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em>, 替换 1 行</div>
+
+<p>我们还以它为基准重新定义了值栈的<span name="plenty">大小</span>，以确保即使在非常深的
+调用树上也有足够的栈槽位。VM 启动时，CallFrame 栈是空的。</p>
+<aside name="plenty">
+<p>如果足够多的函数调用除了局部变量之外还用了足够多的临时值，栈仍然有可能溢出。一个健壮的
+实现会防范这一点，但我想尽量保持简单。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">  vm.stackTop = vm.stack;
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>resetStack</em>() 内</div>
+<pre class="insert">  <span class="i">vm</span>.<span class="i">frameCount</span> = <span class="n">0</span>;
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>resetStack</em>() 内</div>
+
+<p>「vm.h」这个头文件需要访问 ObjFunction，所以我们加一个 include。</p>
+<div class="codehilite"><pre class="insert-before">#define clox_vm_h
+
+</pre><div class="source-file"><em>vm.h</em><br>
+替换 1 行</div>
+<pre class="insert"><span class="a">#include &quot;object.h&quot;</span>
+</pre><pre class="insert-after">#include &quot;table.h&quot;
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em>, 替换 1 行</div>
+
+<p>现在可以转到 VM 的实现文件了。前面还有一堆苦力活。我们已经把 <code>ip</code> 从 VM 结构体挪进了
+CallFrame。VM 里每一处碰到 <code>ip</code> 的代码都得改。还有，那些按栈槽位访问局部变量的指令也得改成
+相对于当前 CallFrame 的 <code>slots</code> 字段来访问。</p>
+<p>我们从顶部开始一路推过去。</p>
+<div class="codehilite"><pre class="insert-before">static InterpretResult run() {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 4 行</div>
+<pre class="insert">  <span class="t">CallFrame</span>* <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span> - <span class="n">1</span>];
+
+<span class="a">#define READ_BYTE() (*frame-&gt;ip++)</span>
+
+<span class="a">#define READ_SHORT() \</span>
+<span class="a">    (frame-&gt;ip += 2, \</span>
+<span class="a">    (uint16_t)((frame-&gt;ip[-2] &lt;&lt; 8) | frame-&gt;ip[-1]))</span>
+
+<span class="a">#define READ_CONSTANT() \</span>
+<span class="a">    (frame-&gt;function-&gt;chunk.constants.values[READ_BYTE()])</span>
+
+</pre><pre class="insert-after">#define READ_STRING() AS_STRING(READ_CONSTANT())
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 4 行</div>
+
+<p>首先，我们把当前最顶层的 CallFrame 存进字节码执行主函数里的一个<span name="local">局部
+变量</span>。然后把那些访问字节码的宏换成经由该变量访问 <code>ip</code> 的版本。</p>
+<aside name="local">
+<p>我们本可以每次都穿过 CallFrame 数组去访问当前帧，但那样太啰嗦。更重要的是，把帧存在一个
+局部变量里会促使 C 编译器把这个指针留在寄存器中，从而加快对帧里 <code>ip</code> 的访问。编译器并不
+<strong>保证</strong>会这么做，但可能性很大。</p>
+</aside>
+<p>接下来是每一条需要好好照顾的指令。</p>
+<div class="codehilite"><pre class="insert-before">      case OP_GET_LOCAL: {
+        uint8_t slot = READ_BYTE();
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">        <span class="i">push</span>(<span class="i">frame</span>-&gt;<span class="i">slots</span>[<span class="i">slot</span>]);
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 1 行</div>
+
+<p>以前，<code>OP_GET_LOCAL</code> 直接从 VM 的栈数组里读给定的局部槽位，也就是说它是从栈底开始索引槽位。
+现在它访问的是当前帧的 <code>slots</code> 数组，也就是从该帧开头起算的编号槽位。</p>
+<p>给局部变量赋值也是同一个做法。</p>
+<div class="codehilite"><pre class="insert-before">      case OP_SET_LOCAL: {
+        uint8_t slot = READ_BYTE();
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">        <span class="i">frame</span>-&gt;<span class="i">slots</span>[<span class="i">slot</span>] = <span class="i">peek</span>(<span class="n">0</span>);
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 1 行</div>
+
+<p>跳转指令过去修改的是 VM 的 <code>ip</code> 字段。现在它们对当前帧的 <code>ip</code> 做同样的事。</p>
+<div class="codehilite"><pre class="insert-before">      case OP_JUMP: {
+        uint16_t offset = READ_SHORT();
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">        <span class="i">frame</span>-&gt;<span class="i">ip</span> += <span class="i">offset</span>;
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 1 行</div>
+
+<p>条件跳转也一样：</p>
+<div class="codehilite"><pre class="insert-before">      case OP_JUMP_IF_FALSE: {
+        uint16_t offset = READ_SHORT();
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">        <span class="k">if</span> (<span class="i">isFalsey</span>(<span class="i">peek</span>(<span class="n">0</span>))) <span class="i">frame</span>-&gt;<span class="i">ip</span> += <span class="i">offset</span>;
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 1 行</div>
+
+<p>还有我们那条向后跳的循环指令：</p>
+<div class="codehilite"><pre class="insert-before">      case OP_LOOP: {
+        uint16_t offset = READ_SHORT();
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">        <span class="i">frame</span>-&gt;<span class="i">ip</span> -= <span class="i">offset</span>;
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 1 行</div>
+
+<p>我们有一段诊断代码会在每条指令执行时把它打印出来，帮我们调试 VM。这也得适配新结构。</p>
+<div class="codehilite"><pre class="insert-before">    printf(&quot;\n&quot;);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">    <span class="i">disassembleInstruction</span>(&amp;<span class="i">frame</span>-&gt;<span class="i">function</span>-&gt;<span class="i">chunk</span>,
+        (<span class="t">int</span>)(<span class="i">frame</span>-&gt;<span class="i">ip</span> - <span class="i">frame</span>-&gt;<span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">code</span>));
+</pre><pre class="insert-after">#endif
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 2 行</div>
+
+<p>它不再接收 VM 的 <code>chunk</code> 和 <code>ip</code> 字段，而是从当前 CallFrame 里读。</p>
+<p>你知道吗，其实也没那么难。大部分指令只是用了那些宏，所以压根不用动。接下来我们上浮一层到
+调用 <code>run()</code> 的那段代码。</p>
+<div class="codehilite"><pre class="insert-before">InterpretResult interpret(const char* source) {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>interpret</em>() 内<br>
+替换 10 行</div>
+<pre class="insert">  <span class="t">ObjFunction</span>* <span class="i">function</span> = <span class="i">compile</span>(<span class="i">source</span>);
+  <span class="k">if</span> (<span class="i">function</span> == <span class="a">NULL</span>) <span class="k">return</span> <span class="a">INTERPRET_COMPILE_ERROR</span>;
+
+  <span class="i">push</span>(<span class="a">OBJ_VAL</span>(<span class="i">function</span>));
+  <span class="t">CallFrame</span>* <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span>++];
+  <span class="i">frame</span>-&gt;<span class="i">function</span> = <span class="i">function</span>;
+  <span class="i">frame</span>-&gt;<span class="i">ip</span> = <span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">code</span>;
+  <span class="i">frame</span>-&gt;<span class="i">slots</span> = <span class="i">vm</span>.<span class="i">stack</span>;
+</pre><pre class="insert-after">
+
+  InterpretResult result = run();
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>interpret</em>() 内, 替换 10 行</div>
+
+<p>我们终于可以把先前编译器的改动和刚刚做的后端改动接起来了。首先，我们把源代码交给编译器。
+它给我们返回一个包含编译好的顶层代码的新 ObjFunction。如果我们拿回 <code>NULL</code>，说明出了编译期
+错误，编译器已经报告过了。那种情况下我们就退出，因为什么都跑不了。</p>
+<p>否则，我们把这个函数压进栈里，并准备好一个初始 CallFrame 来执行它的代码。现在你能看出编译器
+为什么要预留 0 号栈槽位了——它存放被调用的函数。在新的 CallFrame 里，我们指向该函数、把它的
+<code>ip</code> 初始化为指向函数字节码的开头，并让它的栈窗口从 VM 值栈的最底部开始。</p>
+<p>这就让解释器准备好开始执行代码了。执行完毕后，VM 过去会释放那个硬编码的代码块。既然那段
+代码现在由 ObjFunction 拥有，我们就不必这么做了，所以 <code>interpret()</code> 的结尾现在只是这样：</p>
+<div class="codehilite"><pre class="insert-before">  frame-&gt;slots = vm.stack;
+
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>interpret</em>() 内<br>
+替换 4 行</div>
+<pre class="insert">  <span class="k">return</span> <span class="i">run</span>();
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>interpret</em>() 内, 替换 4 行</div>
+
+<p>最后一处引用旧 VM 字段的代码是 <code>runtimeError()</code>。本章后面我们还会回来看它，但现在先改成这样：</p>
+<div class="codehilite"><pre class="insert-before">  fputs(&quot;\n&quot;, stderr);
+
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>runtimeError</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">  <span class="t">CallFrame</span>* <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span> - <span class="n">1</span>];
+  <span class="t">size_t</span> <span class="i">instruction</span> = <span class="i">frame</span>-&gt;<span class="i">ip</span> - <span class="i">frame</span>-&gt;<span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">code</span> - <span class="n">1</span>;
+  <span class="t">int</span> <span class="i">line</span> = <span class="i">frame</span>-&gt;<span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">lines</span>[<span class="i">instruction</span>];
+</pre><pre class="insert-after">  fprintf(stderr, &quot;[line %d] in script\n&quot;, line);
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>runtimeError</em>() 内, 替换 2 行</div>
+
+<p>它不再直接从 VM 读取代码块和 <code>ip</code>，而是从栈顶的 CallFrame 里取。这应该能让函数重新工作起来，
+行为和以前一样。</p>
+<p>假定上面这些都做对了，我们就把 clox 变回了可运行的状态。启动它，它的表现是……和之前完全
+一样。我们还没加任何新特性，所以多少有点让人失望。但整套基础设施现在都在了，也已经准备好
+让我们使用。开始享用吧。</p>
+<h2><a href="#函数声明" id="函数声明"><small>24&#8202;.&#8202;4</small>函数声明</a></h2>
+<p>在我们能做调用表达式之前，得先有东西可调，所以先做函数声明。这个 <span
+name="fun"><code>fun</code></span> 是以关键字开头的。</p>
+<aside name="fun">
+<p>没错，<code>fun</code> 关键字每次出现我都要抖个蹩脚包袱。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">static void declaration() {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>declaration</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_FUN</span>)) {
+    <span class="i">funDeclaration</span>();
+  } <span class="k">else</span> <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_VAR</span>)) {
+</pre><pre class="insert-after">    varDeclaration();
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>declaration</em>() 内, 替换 1 行</div>
+
+<p>它把控制权交给这里：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>block</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">funDeclaration</span>() {
+  <span class="t">uint8_t</span> <span class="i">global</span> = <span class="i">parseVariable</span>(<span class="s">&quot;Expect function name.&quot;</span>);
+  <span class="i">markInitialized</span>();
+  <span class="i">function</span>(<span class="a">TYPE_FUNCTION</span>);
+  <span class="i">defineVariable</span>(<span class="i">global</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>block</em>() 之后</div>
+
+<p>函数是一等值，而一条函数声明只是创建出一个函数、并存进一个新声明的变量里。所以我们像解析
+任何其他变量声明那样解析这个名字。顶层的函数声明会把函数绑定到一个全局变量上。在一个块
+内部或其他函数内部，函数声明会创建一个局部变量。</p>
+<p>在前面某一章里，我解释过变量是<a href="local-variables.html#另一个作用域边界情形">分两个阶段定义</a>的。这确保你没法在一个变量自己的
+初始化器里访问它的值。那会很糟，因为那个变量<strong>还没有</strong>值。</p>
+<p>函数没有这个问题。函数在自己的函数体里引用自己的名字是安全的。在它被完整定义之前，你无法
+<strong>调用</strong>它并执行它的函数体，所以你永远不会看到变量处于未初始化状态。从实用角度看，允许
+这么做是为了支持递归的局部函数。</p>
+<p>为了让这件事成立，我们在编译完名字、还没编译函数体的时候，就把这条函数声明的变量标记为
+「已初始化」。这样名字就能在函数体里被引用而不会报错。</p>
+<p>不过我们确实还需要一个检查。</p>
+<div class="codehilite"><pre class="insert-before">static void markInitialized() {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>markInitialized</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">current</span>-&gt;<span class="i">scopeDepth</span> == <span class="n">0</span>) <span class="k">return</span>;
+</pre><pre class="insert-after">  current-&gt;locals[current-&gt;localCount - 1].depth =
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>markInitialized</em>() 内</div>
+
+<p>以前我们只在已经确定身处局部作用域时才调用 <code>markInitialized()</code>。现在，顶层的函数声明也会
+调用这个函数。那种情况下没有局部变量可以标记为已初始化——函数是被绑定到一个全局变量上的。</p>
+<p>接下来，我们编译函数本身——它的形参列表和块函数体。为此我们用一个独立的辅助函数。这个
+辅助函数生成的代码会把得到的函数对象留在栈顶。之后我们调用 <code>defineVariable()</code>，把这个函数
+存回我们为它声明的那个变量里。</p>
+<p>我把编译形参和函数体的代码单独拆出来，是因为稍后解析类里的方法声明时还要再用它。我们逐步
+搭建，先从这段开始：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>block</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">function</span>(<span class="t">FunctionType</span> <span class="i">type</span>) {
+  <span class="t">Compiler</span> <span class="i">compiler</span>;
+  <span class="i">initCompiler</span>(&amp;<span class="i">compiler</span>, <span class="i">type</span>);
+  <span class="i">beginScope</span>();<span name="no-end-scope"> </span>
+
+  <span class="i">consume</span>(<span class="a">TOKEN_LEFT_PAREN</span>, <span class="s">&quot;Expect &#39;(&#39; after function name.&quot;</span>);
+  <span class="i">consume</span>(<span class="a">TOKEN_RIGHT_PAREN</span>, <span class="s">&quot;Expect &#39;)&#39; after parameters.&quot;</span>);
+  <span class="i">consume</span>(<span class="a">TOKEN_LEFT_BRACE</span>, <span class="s">&quot;Expect &#39;{&#39; before function body.&quot;</span>);
+  <span class="i">block</span>();
+
+  <span class="t">ObjFunction</span>* <span class="i">function</span> = <span class="i">endCompiler</span>();
+  <span class="i">emitBytes</span>(<span class="a">OP_CONSTANT</span>, <span class="i">makeConstant</span>(<span class="a">OBJ_VAL</span>(<span class="i">function</span>)));
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>block</em>() 之后</div>
+
+<aside name="no-end-scope">
+<p>这个 <code>beginScope()</code> 没有配对的 <code>endScope()</code> 调用。因为我们在函数体末尾会彻底结束 Compiler，
+所以没必要去关掉那个悬着的最外层作用域。</p>
+</aside>
+<p>眼下我们先不管形参。我们解析一对空的圆括号，然后是函数体。函数体以一个左花括号开头，就在这里
+解析。然后我们调用已有的 <code>block()</code> 函数，它知道怎么编译一个块的其余部分，包括收尾的花括号。</p>
+<h3><a href="#一栈编译器" id="一栈编译器"><small>24&#8202;.&#8202;4&#8202;.&#8202;1</small>一栈编译器</a></h3>
+<p>有意思的部分是上面和下面那些跟编译器有关的东西。Compiler 结构体存放诸如「哪些槽位归哪些
+局部变量所有」「我们当前嵌了几层块」之类的数据。这些全都是针对单个函数的。但现在前端需要
+处理编译彼此<span name="nested">嵌套</span>的多个函数。</p>
+<aside name="nested">
+<p>记住编译器把顶层代码当作一个隐式函数的函数体，所以只要我们加上<strong>任何</strong>函数声明，我们就进入
+了嵌套函数的世界。</p>
+</aside>
+<p>管理这事的诀窍是：为每个正在编译的函数创建一个独立的 Compiler。我们开始编译一条函数声明时，
+就在 C 栈上创建一个新 Compiler 并初始化它。<code>initCompiler()</code> 把这个 Compiler 设为当前的那个。
+然后在编译函数体时，所有会发射字节码的函数都写进新 Compiler 那个函数所拥有的代码块。</p>
+<p>在到达函数块函数体的末尾之后，我们调用 <code>endCompiler()</code>。它交出刚编译出来的函数对象，我们
+把它作为常量存进<strong>外围</strong>函数的常量表。可是等等，我们怎么回到外围函数去？<code>initCompiler()</code>
+覆盖当前编译器指针的时候，我们把它弄丢了。</p>
+<p>我们的办法是把这一串嵌套的 Compiler 结构体当成一个栈来对待。和 VM 里的 Value 栈、
+CallFrame 栈不同，我们不用数组，而是用链表。每个 Compiler 都指回包围它的那个函数对应的
+Compiler，一路指回顶层代码的根 Compiler。</p>
+<div class="codehilite"><pre class="insert-before">} FunctionType;
+
+</pre><div class="source-file"><em>compiler.c</em><br>
+加在枚举 <em>FunctionType</em> 之后<br>
+替换 1 行</div>
+<pre class="insert"><span class="k">typedef</span> <span class="k">struct</span> <span class="t">Compiler</span> {
+  <span class="k">struct</span> <span class="t">Compiler</span>* <span class="i">enclosing</span>;
+</pre><pre class="insert-after">  ObjFunction* function;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在枚举 <em>FunctionType</em> 之后, 替换 1 行</div>
+
+<p>在 Compiler 结构体内部，我们没法引用 Compiler 的 <strong>typedef</strong>，因为那个声明还没结束。于是我们
+给结构体本身起了个名字，用它来做这个字段的类型。C 真奇怪。</p>
+<p>初始化新 Compiler 时，我们把那个即将不再是「当前」的 Compiler 捕获进这个指针。</p>
+<div class="codehilite"><pre class="insert-before">static void initCompiler(Compiler* compiler, FunctionType type) {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>initCompiler</em>() 内</div>
+<pre class="insert">  <span class="i">compiler</span>-&gt;<span class="i">enclosing</span> = <span class="i">current</span>;
+</pre><pre class="insert-after">  compiler-&gt;function = NULL;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>initCompiler</em>() 内</div>
+
+<p>然后当一个 Compiler 结束时，它通过把前一个编译器恢复成新的「当前」来把自己弹出栈。</p>
+<div class="codehilite"><pre class="insert-before">#endif
+
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>endCompiler</em>() 内</div>
+<pre class="insert">  <span class="i">current</span> = <span class="i">current</span>-&gt;<span class="i">enclosing</span>;
+</pre><pre class="insert-after">  return function;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>endCompiler</em>() 内</div>
+
+<p>注意我们甚至都不需要<span name="compiler">动态</span>分配这些 Compiler 结构体。每个都
+作为局部变量存在 C 栈上——要么在 <code>compile()</code> 里，要么在 <code>function()</code> 里。Compiler 组成的
+链表就穿行在 C 栈之中。我们之所以能有任意多个，是因为我们的编译器用递归下降，所以有了嵌套
+函数声明时 <code>function()</code> 最终会递归调用自己。</p>
+<aside name="compiler">
+<p>用原生栈存放 Compiler 结构体，确实意味着我们的编译器对函数声明能嵌套多深有个实际限制。
+走得太远就可能撑爆 C 栈。如果我们希望编译器对病态甚至恶意代码更健壮——这对 JavaScript VM
+之类的工具是个真正的关切——那么让编译器人为地限制它允许的函数嵌套层数会更好。</p>
+</aside>
+<h3><a href="#函数形参" id="函数形参"><small>24&#8202;.&#8202;4&#8202;.&#8202;2</small>函数形参</a></h3>
+<p>不能传实参的话函数没什么用，所以我们接下来做形参。</p>
+<div class="codehilite"><pre class="insert-before">  consume(TOKEN_LEFT_PAREN, &quot;Expect '(' after function name.&quot;);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>function</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (!<span class="i">check</span>(<span class="a">TOKEN_RIGHT_PAREN</span>)) {
+    <span class="k">do</span> {
+      <span class="i">current</span>-&gt;<span class="i">function</span>-&gt;<span class="i">arity</span>++;
+      <span class="k">if</span> (<span class="i">current</span>-&gt;<span class="i">function</span>-&gt;<span class="i">arity</span> &gt; <span class="n">255</span>) {
+        <span class="i">errorAtCurrent</span>(<span class="s">&quot;Can&#39;t have more than 255 parameters.&quot;</span>);
+      }
+      <span class="t">uint8_t</span> <span class="i">constant</span> = <span class="i">parseVariable</span>(<span class="s">&quot;Expect parameter name.&quot;</span>);
+      <span class="i">defineVariable</span>(<span class="i">constant</span>);
+    } <span class="k">while</span> (<span class="i">match</span>(<span class="a">TOKEN_COMMA</span>));
+  }
+</pre><pre class="insert-after">  consume(TOKEN_RIGHT_PAREN, &quot;Expect ')' after parameters.&quot;);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>function</em>() 内</div>
+
+<p>从语义上说，形参就是声明在函数体最外层词法作用域里的一个局部变量。于是我们可以直接用编译
+器已有的「声明具名局部变量」支持来解析和编译形参。和带初始化器的局部变量不同，这里没有
+任何代码去初始化形参的值。等我们在函数调用里做实参传递时，会看到它们是怎么被初始化的。</p>
+<p>顺便，我们通过数一数解析了多少个形参来记下函数的元数。我们随函数一起存的另一份元数据是它
+的名字。编译一条函数声明时，我们在解析完函数名之后立刻调用 <code>initCompiler()</code>。这意味着我们
+当时就能从前一个词法单元里把名字取出来。</p>
+<div class="codehilite"><pre class="insert-before">  current = compiler;
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>initCompiler</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">type</span> != <span class="a">TYPE_SCRIPT</span>) {
+    <span class="i">current</span>-&gt;<span class="i">function</span>-&gt;<span class="i">name</span> = <span class="i">copyString</span>(<span class="i">parser</span>.<span class="i">previous</span>.<span class="i">start</span>,
+                                         <span class="i">parser</span>.<span class="i">previous</span>.<span class="i">length</span>);
+  }
+</pre><pre class="insert-after">
+
+  Local* local = &amp;current-&gt;locals[current-&gt;localCount++];
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>initCompiler</em>() 内</div>
+
+<p>注意我们小心地为名字字符串做了一份拷贝。记住，词素直接指向原始的源代码字符串，而那个字符串
+可能在代码编译完成后就被释放了。我们在编译器里创建的函数对象比编译器活得久，一直留到运行时。
+所以它需要一份自己堆分配的名字字符串来留着。</p>
+<p>真棒。现在我们能编译函数声明了，像这样：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">areWeHavingItYet</span>() {
+  <span class="k">print</span> <span class="s">&quot;Yes we are!&quot;</span>;
+}
+
+<span class="k">print</span> <span class="i">areWeHavingItYet</span>;
+</pre></div>
+<p>只不过我们还没法用它们做任何<span name="useful">有用</span>的事。</p>
+<aside name="useful">
+<p>我们可以打印它们！不过我猜那也算不上多有用了。</p>
+</aside>
+<h2><a href="#函数调用" id="函数调用"><small>24&#8202;.&#8202;5</small>函数调用</a></h2>
+<p>到这一节末尾，我们会开始看到一些有意思的行为了。下一步是调用函数。我们通常不这么看，但
+函数调用表达式多少有点像一个中缀的 <code>(</code> 运算符。左边是一个被调用物的高优先级表达式——通常
+就是一个单独的标识符。然后是中间的 <code>(</code>，后面跟着用逗号隔开的实参表达式，最后用一个 <code>)</code>
+收尾。</p>
+<p>这个古怪的文法视角，正好解释了怎么把语法挂到我们的解析表里。</p>
+<div class="codehilite"><pre class="insert-before">ParseRule rules[] = {
+</pre><div class="source-file"><em>compiler.c</em><br>
+加在 <em>unary</em>() 之后<br>
+替换 1 行</div>
+<pre class="insert">  [<span class="a">TOKEN_LEFT_PAREN</span>]    = {<span class="i">grouping</span>, <span class="i">call</span>,   <span class="a">PREC_CALL</span>},
+</pre><pre class="insert-after">  [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>unary</em>() 之后, 替换 1 行</div>
+
+<p>当解析器在表达式后面遇到一个左括号时，它会分派到一个新的解析函数。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>binary</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">call</span>(<span class="t">bool</span> <span class="i">canAssign</span>) {
+  <span class="t">uint8_t</span> <span class="i">argCount</span> = <span class="i">argumentList</span>();
+  <span class="i">emitBytes</span>(<span class="a">OP_CALL</span>, <span class="i">argCount</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>binary</em>() 之后</div>
+
+<p>我们已经吃掉了 <code>(</code> 词法单元，所以接下来用一个独立的 <code>argumentList()</code> 辅助函数来编译实参。那个
+函数返回它编译的实参个数。每个实参表达式生成的代码都会把自己的值留在栈上，为这次调用做准备。
+之后我们发射一条新的 <code>OP_CALL</code> 指令来调用函数，用实参个数作为操作数。</p>
+<p>我们用这个老朋友来编译实参：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>defineVariable</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">uint8_t</span> <span class="i">argumentList</span>() {
+  <span class="t">uint8_t</span> <span class="i">argCount</span> = <span class="n">0</span>;
+  <span class="k">if</span> (!<span class="i">check</span>(<span class="a">TOKEN_RIGHT_PAREN</span>)) {
+    <span class="k">do</span> {
+      <span class="i">expression</span>();
+      <span class="i">argCount</span>++;
+    } <span class="k">while</span> (<span class="i">match</span>(<span class="a">TOKEN_COMMA</span>));
+  }
+  <span class="i">consume</span>(<span class="a">TOKEN_RIGHT_PAREN</span>, <span class="s">&quot;Expect &#39;)&#39; after arguments.&quot;</span>);
+  <span class="k">return</span> <span class="i">argCount</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>defineVariable</em>() 之后</div>
+
+<p>这段代码你在 jlox 里应该已经很熟悉了。只要每个表达式后面还有逗号，我们就一路嚼下去。
+实参用完，我们就吃掉最后那个收尾的右括号，收工。</p>
+<p>嗯，几乎是。回到 jlox，我们加过一个编译期检查，不让你给一次调用传超过 255 个实参。当时我说
+那是因为 clox 也会需要一个类似的限制。现在你看出原因了——既然我们把实参个数塞进字节码的
+单字节操作符里，就最多只能到 255。编译器这边也得检查一下。</p>
+<div class="codehilite"><pre class="insert-before">      expression();
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>argumentList</em>() 内</div>
+<pre class="insert">      <span class="k">if</span> (<span class="i">argCount</span> == <span class="n">255</span>) {
+        <span class="i">error</span>(<span class="s">&quot;Can&#39;t have more than 255 arguments.&quot;</span>);
+      }
+</pre><pre class="insert-after">      argCount++;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>argumentList</em>() 内</div>
+
+<p>前端到此为止。我们跳到后端，中间顺便声明一下新指令。</p>
+<div class="codehilite"><pre class="insert-before">  OP_LOOP,
+</pre><div class="source-file"><em>chunk.h</em><br>
+在枚举 <em>OpCode</em> 内</div>
+<pre class="insert">  <span class="a">OP_CALL</span>,
+</pre><pre class="insert-after">  OP_RETURN,
+</pre></div>
+<div class="source-file-narrow"><em>chunk.h</em>, 在枚举 <em>OpCode</em> 内</div>
+
+<h3><a href="#把实参绑定到形参" id="把实参绑定到形参"><small>24&#8202;.&#8202;5&#8202;.&#8202;1</small>把实参绑定到形参</a></h3>
+<p>在动手实现之前，我们得先想清楚调用点上栈是什么样子，以及从那里起我们该做什么。当我们执行到
+调用指令时，被调用函数的表达式已经执行过了，紧跟着是它的实参。假设我们的程序是这样：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">sum</span>(<span class="i">a</span>, <span class="i">b</span>, <span class="i">c</span>) {
+  <span class="k">return</span> <span class="i">a</span> + <span class="i">b</span> + <span class="i">c</span>;
+}
+
+<span class="k">print</span> <span class="n">4</span> + <span class="i">sum</span>(<span class="n">5</span>, <span class="n">6</span>, <span class="n">7</span>);
+</pre></div>
+<p>如果我们在那次 <code>sum()</code> 调用的 <code>OP_CALL</code> 指令上把 VM 暂停，栈长这样：</p><img src="image/calls-and-functions/argument-stack.png" alt="栈：4、fn sum、5、6、7。" />
+<p>站在 <code>sum()</code> 自身的角度想象一下。编译器编译 <code>sum()</code> 时自动分配了 0 号槽位，然后在它之后依次
+为形参 <code>a</code>、<code>b</code>、<code>c</code> 分配了局部槽位。要完成一次对 <code>sum()</code> 的调用，我们需要一个初始化好的
+CallFrame，里面放着被调用的函数和一块它可以使用的栈槽位区域。然后我们得把传给该函数的实参
+收集起来，放进形参对应的那些槽位。</p>
+<p>当 VM 开始执行 <code>sum()</code> 的函数体时，我们希望它的栈窗口长这样：</p><img src="image/calls-and-functions/parameter-window.png" alt="同一个栈，sum() 函数的调用帧窗口把 fn sum、5、6、7 围在中间。" />
+<p>你注意到调用方准备好的实参槽位与被调用方需要的形参槽位，顺序完全对得上吗？多方便！
+这绝非巧合。当我讲每个 CallFrame 都有自己的栈内窗口时，从没说过这些窗口必须<strong>互不重叠</strong>。
+没有什么能阻止我们让它们像这样重叠：</p><img src="image/calls-and-functions/overlapping-windows.png" alt="同一个栈，顶层调用帧覆盖整个栈，sum() 函数的调用帧窗口把 fn sum、5、6、7 围在中间。" />
+<p><span name="lua">调用方</span>的栈顶放着被调用的函数，紧跟着是按顺序排列的实参。我们知道
+调用方在那些槽位之上没有别的槽位在用，因为求值实参表达式时需要的任何临时值这时都已经被丢弃
+了。被调用方栈的底部与它重叠，好让形参槽位恰好与实参值已经在的位置对齐。</p>
+<aside name="lua">
+<p>不同的字节码 VM 和真实的 CPU 架构有不同的<strong>调用约定</strong>，也就是它们各自传递实参、存放返回
+地址等所使用的具体机制。我这里用的机制基于 Lua 那套干净又快速的虚拟机。</p>
+</aside>
+<p>这意味着我们不需要做<strong>任何</strong>工作去「把实参绑定到形参」。既不用在槽位之间拷贝值，也不用跨环境
+拷贝。实参已经在它们该在的地方了。就性能而言，这很难被击败。</p>
+<p>是时候实现这条调用指令了。</p>
+<div class="codehilite"><pre class="insert-before">      }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OP_CALL</span>: {
+        <span class="t">int</span> <span class="i">argCount</span> = <span class="a">READ_BYTE</span>();
+        <span class="k">if</span> (!<span class="i">callValue</span>(<span class="i">peek</span>(<span class="i">argCount</span>), <span class="i">argCount</span>)) {
+          <span class="k">return</span> <span class="a">INTERPRET_RUNTIME_ERROR</span>;
+        }
+        <span class="k">break</span>;
+      }
+</pre><pre class="insert-after">      case OP_RETURN: {
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>我们需要知道被调用的函数和传给它的实参个数。后者从指令的操作数里拿到。它同时也告诉了我们
+该从哪里找到函数：从栈顶往回数过那些实参槽位即可。我们把这些数据交给一个独立的 <code>callValue()</code>
+函数。如果它返回 <code>false</code>，就说明这次调用导致了某种运行时错误。那种情况下我们中止解释器。</p>
+<p>如果 <code>callValue()</code> 成功，CallFrame 栈上就会为被调用的函数压入一个新帧。<code>run()</code> 函数缓存了
+一个指向当前帧的指针，所以我们得更新它。</p>
+<div class="codehilite"><pre class="insert-before">          return INTERPRET_RUNTIME_ERROR;
+        }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">        <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span> - <span class="n">1</span>];
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>既然字节码分派循环是从那个 <code>frame</code> 变量里读的，那么当 VM 去执行下一条指令时，它会从刚被调用
+的函数的 CallFrame 里读出 <code>ip</code>，并跳到它的代码。执行这次调用的工作从这儿开始：</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>peek</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">bool</span> <span class="i">callValue</span>(<span class="t">Value</span> <span class="i">callee</span>, <span class="t">int</span> <span class="i">argCount</span>) {
+  <span class="k">if</span> (<span class="a">IS_OBJ</span>(<span class="i">callee</span>)) {
+    <span class="k">switch</span> (<span class="a">OBJ_TYPE</span>(<span class="i">callee</span>)) {
+      <span class="k">case</span> <span class="a">OBJ_FUNCTION</span>:<span name="switch"> </span>
+        <span class="k">return</span> <span class="i">call</span>(<span class="a">AS_FUNCTION</span>(<span class="i">callee</span>), <span class="i">argCount</span>);
+      <span class="k">default</span>:
+        <span class="k">break</span>; <span class="c">// 不可调用的对象类型。</span>
+    }
+  }
+  <span class="i">runtimeError</span>(<span class="s">&quot;Can only call functions and classes.&quot;</span>);
+  <span class="k">return</span> <span class="k">false</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>peek</em>() 之后</div>
+
+<aside name="switch">
+<p>现在用 <code>switch</code> 语句只检查一种类型是有点大材小用，但等我们加上其他可调用类型的分支时它就
+说得通了。</p>
+</aside>
+<p>这里要做的事不止初始化一个新 CallFrame。因为 Lox 是动态类型的，你没法阻止用户写出这样的
+坏代码：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">notAFunction</span> = <span class="n">123</span>;
+<span class="i">notAFunction</span>();
+</pre></div>
+<p>真发生了这种情况，运行时需要安全地报错并停止。所以我们做的第一件事是检查我们试图调用的那个
+值的类型。如果它不是函数，我们就报错退出。否则，真正的调用发生在这里：</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>peek</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">bool</span> <span class="i">call</span>(<span class="t">ObjFunction</span>* <span class="i">function</span>, <span class="t">int</span> <span class="i">argCount</span>) {
+  <span class="t">CallFrame</span>* <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span>++];
+  <span class="i">frame</span>-&gt;<span class="i">function</span> = <span class="i">function</span>;
+  <span class="i">frame</span>-&gt;<span class="i">ip</span> = <span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">code</span>;
+  <span class="i">frame</span>-&gt;<span class="i">slots</span> = <span class="i">vm</span>.<span class="i">stackTop</span> - <span class="i">argCount</span> - <span class="n">1</span>;
+  <span class="k">return</span> <span class="k">true</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>peek</em>() 之后</div>
+
+<p>这只做了初始化下一个 CallFrame 的事。它存下指向被调用函数的指针，并把该帧的 <code>ip</code> 指向函数
+字节码的开头。最后它设置 <code>slots</code> 指针，给出这个帧在栈上的窗口。那里的算术确保了栈上已有的
+实参与函数的形参对齐：</p><img src="image/calls-and-functions/arithmetic.png" alt="由 stackTop 和 argCount 算出 frame-&gt;slots 的算术。" />
+<p>那个有点好笑的 <code>- 1</code> 是为了照顾 0 号栈槽位——编译器为我们稍后加方法时预留了它。形参从 1 号
+槽位开始，所以我们让窗口早一个槽位开始，好和实参对齐。</p>
+<p>继续之前，我们把新指令加进反汇编器。</p>
+<div class="codehilite"><pre class="insert-before">      return jumpInstruction(&quot;OP_LOOP&quot;, -1, chunk, offset);
+</pre><div class="source-file"><em>debug.c</em><br>
+在 <em>disassembleInstruction</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OP_CALL</span>:
+      <span class="k">return</span> <span class="i">byteInstruction</span>(<span class="s">&quot;OP_CALL&quot;</span>, <span class="i">chunk</span>, <span class="i">offset</span>);
+</pre><pre class="insert-after">    case OP_RETURN:
+</pre></div>
+<div class="source-file-narrow"><em>debug.c</em>, 在 <em>disassembleInstruction</em>() 内</div>
+
+<p>再来一次小小的绕路。现在我们有了一个顺手的函数来初始化 CallFrame，不妨用它来为执行顶层
+代码准备好第一个帧。</p>
+<div class="codehilite"><pre class="insert-before">  push(OBJ_VAL(function));
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>interpret</em>() 内<br>
+替换 4 行</div>
+<pre class="insert">  <span class="i">call</span>(<span class="i">function</span>, <span class="n">0</span>);
+</pre><pre class="insert-after">
+
+  return run();
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>interpret</em>() 内, 替换 4 行</div>
+
+<p>好，现在回到调用……</p>
+<h3><a href="#运行时错误检查" id="运行时错误检查"><small>24&#8202;.&#8202;5&#8202;.&#8202;2</small>运行时错误检查</a></h3>
+<p>重叠的栈窗口能成立，靠的是这样一个假设：一次调用为函数的每个形参恰好传一个实参。但同样地，
+因为 Lox 不是静态类型，一个糊涂的用户可能传多或传少。在 Lox 里我们把这定义为运行时错误，
+报告方式如下：</p>
+<div class="codehilite"><pre class="insert-before">static bool call(ObjFunction* function, int argCount) {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>call</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">argCount</span> != <span class="i">function</span>-&gt;<span class="i">arity</span>) {
+    <span class="i">runtimeError</span>(<span class="s">&quot;Expected %d arguments but got %d.&quot;</span>,
+        <span class="i">function</span>-&gt;<span class="i">arity</span>, <span class="i">argCount</span>);
+    <span class="k">return</span> <span class="k">false</span>;
+  }
+
+</pre><pre class="insert-after">  CallFrame* frame = &amp;vm.frames[vm.frameCount++];
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>call</em>() 内</div>
+
+<p>相当直白。这就是为什么我们把每个函数的元数存在它的 ObjFunction 里面。</p>
+<p>还有另一个错误要报告，不过它跟用户的糊涂相比更关乎我们自己。由于 CallFrame 数组大小固定，
+我们得确保很深的调用链不会把它撑爆。</p>
+<div class="codehilite"><pre class="insert-before">  }
+
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>call</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">vm</span>.<span class="i">frameCount</span> == <span class="a">FRAMES_MAX</span>) {
+    <span class="i">runtimeError</span>(<span class="s">&quot;Stack overflow.&quot;</span>);
+    <span class="k">return</span> <span class="k">false</span>;
+  }
+
+</pre><pre class="insert-after">  CallFrame* frame = &amp;vm.frames[vm.frameCount++];
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>call</em>() 内</div>
+
+<p>实践中，如果一个程序接近了这个限制，那多半是某段失控的递归代码里有 bug。</p>
+<h3><a href="#打印堆栈跟踪" id="打印堆栈跟踪"><small>24&#8202;.&#8202;5&#8202;.&#8202;3</small>打印堆栈跟踪</a></h3>
+<p>既然说到运行时错误，我们花点时间让它们更有用。遇到运行时错误就停下来，对于防止 VM 以某种
+未定义的方式崩溃烧毁是很重要的。但仅仅中止并不能帮用户修好那些<strong>导致</strong>了这个错误的代码。</p>
+<p>辅助调试运行时故障的经典工具是<strong>堆栈跟踪</strong>——把程序死掉时仍在执行的每个函数都打印出来，
+外加它死掉那一刻执行到了哪里。现在我们有了调用栈，又顺手把每个函数的名字都存了下来，于是可以在运行时错误把用户折腾得够呛时，把整个栈显示出来。它长这样：</p>
+<div class="codehilite"><pre class="insert-before">  fputs(&quot;\n&quot;, stderr);
+
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>runtimeError</em>() 内<br>
+替换 4 行</div>
+<pre class="insert">  <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="i">vm</span>.<span class="i">frameCount</span> - <span class="n">1</span>; <span class="i">i</span> &gt;= <span class="n">0</span>; <span class="i">i</span>--) {
+    <span class="t">CallFrame</span>* <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">i</span>];
+    <span class="t">ObjFunction</span>* <span class="i">function</span> = <span class="i">frame</span>-&gt;<span class="i">function</span>;
+    <span class="t">size_t</span> <span class="i">instruction</span> = <span class="i">frame</span>-&gt;<span class="i">ip</span> - <span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">code</span> - <span class="n">1</span>;
+    <span class="i">fprintf</span>(<span class="i">stderr</span>, <span class="s">&quot;[line %d] in &quot;</span>,<span name="minus"> </span>
+            <span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">lines</span>[<span class="i">instruction</span>]);
+    <span class="k">if</span> (<span class="i">function</span>-&gt;<span class="i">name</span> == <span class="a">NULL</span>) {
+      <span class="i">fprintf</span>(<span class="i">stderr</span>, <span class="s">&quot;script</span><span class="e">\n</span><span class="s">&quot;</span>);
+    } <span class="k">else</span> {
+      <span class="i">fprintf</span>(<span class="i">stderr</span>, <span class="s">&quot;%s()</span><span class="e">\n</span><span class="s">&quot;</span>, <span class="i">function</span>-&gt;<span class="i">name</span>-&gt;<span class="i">chars</span>);
+    }
+  }
+
+</pre><pre class="insert-after">  resetStack();
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>runtimeError</em>() 内, 替换 4 行</div>
+
+<aside name="minus">
+<p>那个 <code>- 1</code> 是因为 IP 已经停在下一条待执行指令上了，而我们希望堆栈跟踪指向上一条失败的指令。</p>
+</aside>
+<p>打印完错误信息本身，我们从<span name="top">栈顶</span>（最近被调用的那个函数）走到栈底
+（顶层代码）。对每一帧，我们找出该帧函数内部与当前 <code>ip</code> 对应的行号，然后把行号连同函数名
+一起打印出来。</p>
+<aside name="top">
+<p>对于堆栈跟踪里各帧该按什么顺序展示，是有些分歧的。多数实现把最内层的函数放在第一行，然后
+朝栈底方向排下去。Python 则按相反的顺序打印。所以从上往下读，能知道你的程序是怎么走到现在
+这个位置的，而最后一行才是错误实际发生的地方。</p>
+<p>这种风格是有道理的。它保证你总能看到最内层的函数，哪怕堆栈跟踪太长塞不进一屏。另一方面，
+新闻业里的「<a href="https://en.wikipedia.org/wiki/Inverted_pyramid_(journalism)">倒金字塔</a>」告诉我们，在一段文字里应该把最重要的信息放在<strong>最前面</strong>。在堆栈
+跟踪里，那就是错误实际发生的那个函数。其他大多数语言实现都是这么做的。</p>
+</aside>
+<p>比如说，如果你运行这个坏掉的程序：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">a</span>() { <span class="i">b</span>(); }
+<span class="k">fun</span> <span class="i">b</span>() { <span class="i">c</span>(); }
+<span class="k">fun</span> <span class="i">c</span>() {
+  <span class="i">c</span>(<span class="s">&quot;too&quot;</span>, <span class="s">&quot;many&quot;</span>);
+}
+
+<span class="i">a</span>();
+</pre></div>
+<p>它会打印出：</p>
+<div class="codehilite"><pre>Expected 0 arguments but got 2.
+[line 4] in c()
+[line 2] in b()
+[line 1] in a()
+[line 7] in script
+</pre></div>
+<p>看起来还不赖，是吧？</p>
+<h3><a href="#从函数返回" id="从函数返回"><small>24&#8202;.&#8202;5&#8202;.&#8202;4</small>从函数返回</a></h3>
+<p>我们快接近了。我们能调用函数，VM 也会执行它们。但我们还不能从它们<strong>返回</strong>。<code>OP_RETURN</code>
+指令我们已经挂了挺久了，可它里面一直挂着某种临时代码，只为把我们从字节码循环里捞出来。
+现在是给它一个正式实现的时候了。</p>
+<div class="codehilite"><pre class="insert-before">      case OP_RETURN: {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">        <span class="t">Value</span> <span class="i">result</span> = <span class="i">pop</span>();
+        <span class="i">vm</span>.<span class="i">frameCount</span>--;
+        <span class="k">if</span> (<span class="i">vm</span>.<span class="i">frameCount</span> == <span class="n">0</span>) {
+          <span class="i">pop</span>();
+          <span class="k">return</span> <span class="a">INTERPRET_OK</span>;
+        }
+
+        <span class="i">vm</span>.<span class="i">stackTop</span> = <span class="i">frame</span>-&gt;<span class="i">slots</span>;
+        <span class="i">push</span>(<span class="i">result</span>);
+        <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span> - <span class="n">1</span>];
+        <span class="k">break</span>;
+</pre><pre class="insert-after">      }
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 2 行</div>
+
+<p>当一个函数返回值时，那个值会在栈顶。我们正要丢弃被调用函数整个的栈窗口，所以先把返回值弹出
+来攥在手里。然后丢弃返回中那个函数的 CallFrame。如果那已经是最后一个 CallFrame，就说明我们
+执行完了顶层代码。整个程序结束了，于是我们把主脚本函数从栈上弹出，然后退出解释器。</p>
+<p>否则，我们丢弃被调用方用来放形参和局部变量的所有槽位。这里面包括调用方当初用来传实参的
+同一批槽位。现在调用已经结束，调用方不再需要它们了。这就意味着栈顶最终正好落在返回中那个
+函数的栈窗口开头处。</p>
+<p>我们把返回值压回栈上那个更低的、新的位置。然后更新 <code>run()</code> 那个缓存的当前帧指针。就像我们
+开始一次调用时一样，在字节码分派循环的下一轮迭代里，VM 会从那个帧读出 <code>ip</code>，执行就跳回
+调用方，正好停在你离开的地方，紧跟在 <code>OP_CALL</code> 指令之后。</p><img src="image/calls-and-functions/return.png" alt="返回过程的每一步：弹出返回值、丢弃调用帧、压入返回值。" />
+<p>注意我们在这里假定函数<strong>确实</strong>返回了值，但一个函数也可以执行到函数体末尾而隐式返回：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">noReturn</span>() {
+  <span class="k">print</span> <span class="s">&quot;Do stuff&quot;</span>;
+  <span class="c">// No return here.</span>
+}
+
+<span class="k">print</span> <span class="i">noReturn</span>(); <span class="c">// ???</span>
+</pre></div>
+<p>这个也得正确处理。语言规定这种情况下隐式返回 <code>nil</code>。为此我们加上这个：</p>
+<div class="codehilite"><pre class="insert-before">static void emitReturn() {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>emitReturn</em>() 内</div>
+<pre class="insert">  <span class="i">emitByte</span>(<span class="a">OP_NIL</span>);
+</pre><pre class="insert-after">  emitByte(OP_RETURN);
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>emitReturn</em>() 内</div>
+
+<p>编译器调用 <code>emitReturn()</code> 在函数体末尾写出 <code>OP_RETURN</code> 指令。而在那之前，它会先发射一条把
+<code>nil</code> 压栈的指令。就这样，我们有了能用的函数调用！它们甚至还能接收形参！看起来我们几乎像是
+知道自己在干什么。</p>
+<h2><a href="#return-语句" id="return-语句"><small>24&#8202;.&#8202;6</small>Return 语句</a></h2>
+<p>如果你想要一个返回隐式 <code>nil</code> 以外的东西的函数，就需要一条 <code>return</code> 语句。我们来把它搞定。</p>
+<div class="codehilite"><pre class="insert-before">    ifStatement();
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>statement</em>() 内</div>
+<pre class="insert">  } <span class="k">else</span> <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_RETURN</span>)) {
+    <span class="i">returnStatement</span>();
+</pre><pre class="insert-after">  } else if (match(TOKEN_WHILE)) {
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>statement</em>() 内</div>
+
+<p>当编译器看到 <code>return</code> 关键字时，它会走到这里：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>printStatement</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">returnStatement</span>() {
+  <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_SEMICOLON</span>)) {
+    <span class="i">emitReturn</span>();
+  } <span class="k">else</span> {
+    <span class="i">expression</span>();
+    <span class="i">consume</span>(<span class="a">TOKEN_SEMICOLON</span>, <span class="s">&quot;Expect &#39;;&#39; after return value.&quot;</span>);
+    <span class="i">emitByte</span>(<span class="a">OP_RETURN</span>);
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>printStatement</em>() 之后</div>
+
+<p>返回值表达式是可选的，所以解析器会去找分号词法单元来判断有没有给出值。如果没有返回值，这条语句
+隐式返回 <code>nil</code>。我们通过调用 <code>emitReturn()</code> 来实现，它会发射一条 <code>OP_NIL</code> 指令。否则，我们
+编译返回值表达式，并用一条 <code>OP_RETURN</code> 指令返回它。</p>
+<p>这就是我们已经实现过的同一条 <code>OP_RETURN</code> 指令——我们不需要任何新的运行时代码。这和 jlox
+差别相当大。在那里，执行一条 <code>return</code> 语句时我们不得不用异常把栈退回去。那是因为你可以从
+某堆嵌套块的深处返回。既然 jlox 是递归遍历 AST 的，那就意味着一堆我们需要逃出去的 Java
+方法调用。</p>
+<p>我们的字节码编译器把这一切都抹平了。解析阶段我们做递归下降，但运行时，VM 的字节码分派循环
+是完全扁平的。C 这一层根本没有任何递归。所以返回——哪怕是从某堆嵌套块内部返回——就像从函数体
+末尾返回一样简单。</p>
+<p>不过我们还没完全干完。新的 <code>return</code> 语句带来一个要操心的编译错误。返回对从函数里返回很有用，
+但 Lox 程序的顶层也是命令式代码。你不该能从那里<span name="worst">返回</span>。</p>
+<div class="codehilite"><pre><span class="k">return</span> <span class="s">&quot;What?!&quot;</span>;
+</pre></div>
+<aside name="worst">
+<p>允许在顶层 <code>return</code> 也不算是世界上最糟的主意。它会给你一个自然的方式来提前终止脚本。
+你甚至可能可以用返回的数字来表示进程的退出码。</p>
+</aside>
+<p>我们规定在任何函数之外出现 <code>return</code> 语句都是编译错误，实现方式如下：</p>
+<div class="codehilite"><pre class="insert-before">static void returnStatement() {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>returnStatement</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">current</span>-&gt;<span class="i">type</span> == <span class="a">TYPE_SCRIPT</span>) {
+    <span class="i">error</span>(<span class="s">&quot;Can&#39;t return from top-level code.&quot;</span>);
+  }
+
+</pre><pre class="insert-after">  if (match(TOKEN_SEMICOLON)) {
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>returnStatement</em>() 内</div>
+
+<p>这也是我们给编译器加上那个 FunctionType 枚举的原因之一。</p>
+<h2><a href="#原生函数" id="原生函数"><small>24&#8202;.&#8202;7</small>原生函数</a></h2>
+<p>我们的 VM 越来越强了。有了函数、调用、形参、返回。你可以定义很多不同的函数，并以各种
+有意思的方式互相调用。但归根结底，它们其实做不了<strong>任何</strong>事。不管一个 Lox 程序有多复杂，
+用户唯一看得到的操作只有打印。要增加更多能力，我们得把它们暴露给用户。</p>
+<p>一个编程语言实现是靠<strong>原生函数</strong>跟外部世界打交道的。如果你希望用户能写出检查时间、读取
+用户输入或访问文件系统的程序，我们就需要加入原生函数——从 Lox 可调用、但用 C 实现的函数——
+来暴露这些能力。</p>
+<p>在语言层面，Lox 已经相当完整了——它有闭包、类、继承，还有其他一堆好玩的东西。它之所以让人
+感觉像个玩具语言，很大程度上是因为它几乎没有任何原生能力。加上长长一串之后，它就能变成一门
+真正的语言。</p>
+<p>不过，啃完一大堆操作系统调用其实没什么教育意义。一旦你看懂了怎么把一段 C 代码绑定到 Lox，
+道理就通了。但你确实得看<strong>一个</strong>，而且哪怕单个原生函数也要我们把 Lox 与 C 互操作的整套机制
+搭出来。所以我们会走完这套流程，把苦活干完。然后，等做完之后，我们再加一个小原生函数，
+只为证明它确实能用。</p>
+<p>我们需要新机制，是因为从实现的角度看，原生函数和 Lox 函数不一样。它们被调用时不会压入
+CallFrame，因为没有字节码代码可供那一帧指向。它们没有字节码代码块，而是以某种方式引用了
+一段原生的 C 代码。</p>
+<p>我们在 clox 里的做法，是把原生函数定义成一个完全不同的对象类型。</p>
+<div class="codehilite"><pre class="insert-before">} ObjFunction;
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjFunction</em> 之后</div>
+<pre class="insert">
+
+<span class="k">typedef</span> <span class="t">Value</span> (*<span class="t">NativeFn</span>)(<span class="t">int</span> <span class="i">argCount</span>, <span class="t">Value</span>* <span class="i">args</span>);
+
+<span class="k">typedef</span> <span class="k">struct</span> {
+  <span class="t">Obj</span> <span class="i">obj</span>;
+  <span class="t">NativeFn</span> <span class="i">function</span>;
+} <span class="t">ObjNative</span>;
+</pre><pre class="insert-after">
+
+struct ObjString {
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjFunction</em> 之后</div>
+
+<p>它的表示比 ObjFunction 简单——只有一个 Obj 头部和一个指向实现该原生行为的 C 函数的指针。
+这个原生函数接收实参个数和一个指向栈上第一个实参的指针。它通过那个指针访问实参。干完之后，
+它返回结果值。</p>
+<p>和往常一样，新对象类型总带着一套附属品。要创建一个 ObjNative，我们声明一个类似构造函数
+的函数。</p>
+<div class="codehilite"><pre class="insert-before">ObjFunction* newFunction();
+</pre><div class="source-file"><em>object.h</em><br>
+加在 <em>newFunction</em>() 之后</div>
+<pre class="insert"><span class="t">ObjNative</span>* <span class="i">newNative</span>(<span class="t">NativeFn</span> <span class="i">function</span>);
+</pre><pre class="insert-after">ObjString* takeString(char* chars, int length);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在 <em>newFunction</em>() 之后</div>
+
+<p>我们这样实现它：</p>
+<div class="codehilite"><div class="source-file"><em>object.c</em><br>
+加在 <em>newFunction</em>() 之后</div>
+<pre><span class="t">ObjNative</span>* <span class="i">newNative</span>(<span class="t">NativeFn</span> <span class="i">function</span>) {
+  <span class="t">ObjNative</span>* <span class="i">native</span> = <span class="a">ALLOCATE_OBJ</span>(<span class="t">ObjNative</span>, <span class="a">OBJ_NATIVE</span>);
+  <span class="i">native</span>-&gt;<span class="i">function</span> = <span class="i">function</span>;
+  <span class="k">return</span> <span class="i">native</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 加在 <em>newFunction</em>() 之后</div>
+
+<p>这个「构造函数」接收一个要包进 ObjNative 的 C 函数指针。它搭好对象头部并存下该函数。头部
+这边，我们需要一个新的对象类型。</p>
+<div class="codehilite"><pre class="insert-before">typedef enum {
+  OBJ_FUNCTION,
+</pre><div class="source-file"><em>object.h</em><br>
+在枚举 <em>ObjType</em> 内</div>
+<pre class="insert">  <span class="a">OBJ_NATIVE</span>,
+</pre><pre class="insert-after">  OBJ_STRING,
+} ObjType;
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在枚举 <em>ObjType</em> 内</div>
+
+<p>VM 还得知道怎么释放一个原生函数对象。</p>
+<div class="codehilite"><pre class="insert-before">    }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_NATIVE</span>:
+      <span class="a">FREE</span>(<span class="t">ObjNative</span>, <span class="i">object</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_STRING: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<p>这里没什么内容，因为 ObjNative 不拥有任何额外的内存。所有 Lox 对象支持的另一项能力是被打印。</p>
+<div class="codehilite"><pre class="insert-before">      break;
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>printObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_NATIVE</span>:
+      <span class="i">printf</span>(<span class="s">&quot;&lt;native fn&gt;&quot;</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_STRING:
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>printObject</em>() 内</div>
+
+<p>为了支持动态类型，我们有一个宏来判断一个值是不是原生函数。</p>
+<div class="codehilite"><pre class="insert-before">#define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)</span>
+</pre><pre class="insert-after">#define IS_STRING(value)       isObjType(value, OBJ_STRING)
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>假定这个宏返回真，这个宏就从代表原生函数的 Value 里取出 C 函数指针：</p>
+<div class="codehilite"><pre class="insert-before">#define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define AS_NATIVE(value) \</span>
+<span class="a">    (((ObjNative*)AS_OBJ(value))-&gt;function)</span>
+</pre><pre class="insert-after">#define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>这一整套行头让 VM 能像对待任何其他对象那样对待原生函数。你可以把它们存进变量、到处传递、
+给它们办生日派对等等。当然，我们真正关心的是<strong>调用</strong>它们——在调用表达式里把一个当作左操作数。</p>
+<p>在 <code>callValue()</code> 那边，我们再加一个类型分支。</p>
+<div class="codehilite"><pre class="insert-before">      case OBJ_FUNCTION:<span name="switch"> </span>
+        return call(AS_FUNCTION(callee), argCount);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>callValue</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OBJ_NATIVE</span>: {
+        <span class="t">NativeFn</span> <span class="i">native</span> = <span class="a">AS_NATIVE</span>(<span class="i">callee</span>);
+        <span class="t">Value</span> <span class="i">result</span> = <span class="i">native</span>(<span class="i">argCount</span>, <span class="i">vm</span>.<span class="i">stackTop</span> - <span class="i">argCount</span>);
+        <span class="i">vm</span>.<span class="i">stackTop</span> -= <span class="i">argCount</span> + <span class="n">1</span>;
+        <span class="i">push</span>(<span class="i">result</span>);
+        <span class="k">return</span> <span class="k">true</span>;
+      }
+</pre><pre class="insert-after">      default:
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>callValue</em>() 内</div>
+
+<p>如果被调用的对象是个原生函数，我们就当场调用那个 C 函数。完全没必要去折腾 CallFrame 之类
+的东西。我们只要把活交给 C，拿回结果，再塞回栈里。这让原生函数快到了极致。</p>
+<p>这样一来，用户应该能调用原生函数了，可我们还没有任何原生函数可调。没有像外部函数接口
+（FFI）这样的东西，用户无法定义自己的原生函数。那是我们作为 VM 实现者的活儿。我们先从
+一个定义新原生函数、并暴露给 Lox 程序的辅助函数开始。</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>runtimeError</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">defineNative</span>(<span class="k">const</span> <span class="t">char</span>* <span class="i">name</span>, <span class="t">NativeFn</span> <span class="i">function</span>) {
+  <span class="i">push</span>(<span class="a">OBJ_VAL</span>(<span class="i">copyString</span>(<span class="i">name</span>, (<span class="t">int</span>)<span class="i">strlen</span>(<span class="i">name</span>))));
+  <span class="i">push</span>(<span class="a">OBJ_VAL</span>(<span class="i">newNative</span>(<span class="i">function</span>)));
+  <span class="i">tableSet</span>(&amp;<span class="i">vm</span>.<span class="i">globals</span>, <span class="a">AS_STRING</span>(<span class="i">vm</span>.<span class="i">stack</span>[<span class="n">0</span>]), <span class="i">vm</span>.<span class="i">stack</span>[<span class="n">1</span>]);
+  <span class="i">pop</span>();
+  <span class="i">pop</span>();
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>runtimeError</em>() 之后</div>
+
+<p>它接收一个 C 函数的指针，以及这个函数在 Lox 中将要使用的名字。我们把该函数包进一个
+ObjNative，然后把那个对象存进一个同名的全局变量里。</p>
+<p>你可能在想，为什么我们要把名字和函数在栈上压进去又弹出来。看起来很奇怪，对吧？这类事情
+正是<span name="worry">垃圾</span>回收介入时你不得不操心的事。<code>copyString()</code> 和 <code>newNative()</code> 都会动态分配内存。
+这意味着一旦我们有了 GC，它们就可能触发一次回收。如果真发生了，我们得确保回收器知道我们
+还没用完那个名字和那个 ObjFunction，这样它才不会在我们脚下把它们释放掉。把它们存在值栈上
+就达到了这个目的。</p>
+<aside name="worry">
+<p>如果你没跟上上面那一大段，也没关系。等我们真的<a href="garbage-collection.html">实现 GC</a>的时候，它会好懂得多。</p>
+</aside>
+<p>感觉很傻，但干完上面那一大堆活之后，我们只加了一个小原生函数。</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在变量 <em>vm</em> 之后</div>
+<pre><span class="k">static</span> <span class="t">Value</span> <span class="i">clockNative</span>(<span class="t">int</span> <span class="i">argCount</span>, <span class="t">Value</span>* <span class="i">args</span>) {
+  <span class="k">return</span> <span class="a">NUMBER_VAL</span>((<span class="t">double</span>)<span class="i">clock</span>() / <span class="a">CLOCKS_PER_SEC</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在变量 <em>vm</em> 之后</div>
+
+<p>它返回程序开始运行以来经过的时间，单位是秒。拿它给 Lox 程序做基准测试很方便。在 Lox 里，
+我们把它命名为 <code>clock()</code>。</p>
+<div class="codehilite"><pre class="insert-before">  initTable(&amp;vm.strings);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>initVM</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">defineNative</span>(<span class="s">&quot;clock&quot;</span>, <span class="i">clockNative</span>);
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>initVM</em>() 内</div>
+
+<p>为了用到 C 标准库里的 <code>clock()</code> 函数，「vm」模块需要加一个 include。</p>
+<div class="codehilite"><pre class="insert-before">#include &lt;string.h&gt;
+</pre><div class="source-file"><em>vm.c</em></div>
+<pre class="insert"><span class="a">#include &lt;time.h&gt;</span>
+</pre><pre class="insert-after">
+
+#include &quot;common.h&quot;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em></div>
+
+<p>要消化的材料可真不少，不过我们还是干完了！把这些输进去试试：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">fib</span>(<span class="i">n</span>) {
+  <span class="k">if</span> (<span class="i">n</span> &lt; <span class="n">2</span>) <span class="k">return</span> <span class="i">n</span>;
+  <span class="k">return</span> <span class="i">fib</span>(<span class="i">n</span> - <span class="n">2</span>) + <span class="i">fib</span>(<span class="i">n</span> - <span class="n">1</span>);
+}
+
+<span class="k">var</span> <span class="i">start</span> = <span class="i">clock</span>();
+<span class="k">print</span> <span class="i">fib</span>(<span class="n">35</span>);
+<span class="k">print</span> <span class="i">clock</span>() - <span class="i">start</span>;
+</pre></div>
+<p>我们可以写一个效率低得惊人的递归斐波那契函数。更妙的是，我们还能测量它<span name="faster"><strong>有多</strong></span>低效。
+这当然不是算斐波那契数最聪明的方式。但它是一个检验语言实现对函数调用支持程度的好办法。
+在我的机器上，在 clox 里跑这段比在 jlox 里跑快大约五倍。这可是相当大的改进。</p>
+<aside name="faster">
+<p>它比同样一个程序用 Ruby 2.4.3p205 跑要慢一点，比用 Python 3.7.3 跑快大约 3 倍。而且我们的
+VM 里还有很多简单的优化可以做。</p>
+</aside>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>读写 <code>ip</code> 字段是字节码循环里最频繁的操作之一。目前我们是通过一个指向当前 CallFrame 的
+指针来访问它。这需要一层指针间接，可能会迫使 CPU 绕过缓存去访问主存。那可能是个实打实
+的性能黑洞。</p>
+<p>理想情况下，我们会把 <code>ip</code> 放在 CPU 的原生寄存器里。C 不让我们在不写内联汇编的前提下
+<strong>强制</strong>这一点，但我们可以组织代码来鼓励编译器做这个优化。如果我们把 <code>ip</code> 直接存成一个
+C 局部变量并标记为 <code>register</code>，C 编译器很有可能答应我们这个客气的请求。</p>
+<p>这确实意味着我们得小心，在函数调用开始和结束时把局部 <code>ip</code> 正确地写回对应的 CallFrame。
+实现这个优化。写几个基准测试，看看它对性能的影响。你觉得多出来的代码复杂度值吗？</p>
+</li>
+<li>
+<p>原生函数调用快，部分原因是我们没有校验这次调用传入的实参个数是否与函数期望的相同。
+我们其实真该校验，否则一次实参不足的错误原生函数调用就可能让函数去读未初始化的内存。
+加上元数检查。</p>
+</li>
+<li>
+<p>目前，原生函数没有办法发出运行时错误。在一个真实的实现里，这是我们必须支持的，因为
+原生函数生活在静态类型的 C 世界里，却被来自动态类型的 Lox 世界的程序调用。比如用户
+试着给 <code>sqrt()</code> 传一个字符串，那个原生函数就需要报运行时错误。</p>
+<p>扩展原生函数系统来支持这件事。这项能力会怎么影响原生调用的性能？</p>
+</li>
+<li>
+<p>再加几个你觉得有用的原生函数。用它们写些程序。你加了些什么？它们对这门语言的手感和实用性有多大影响？</p>
+</li>
+</ol>
+</div>
+
+<footer>
+<a href="closures.html" class="next">
+  下一章：&ldquo;闭包&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

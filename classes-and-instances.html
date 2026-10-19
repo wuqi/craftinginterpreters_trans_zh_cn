@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>类与实例 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">类与实例<small>27</small></a></h3>
+
+<ul>
+    <li><a href="#类对象"><small>27.1</small> 类对象</a></li>
+    <li><a href="#类声明"><small>27.2</small> 类声明</a></li>
+    <li><a href="#类的实例"><small>27.3</small> 类的实例</a></li>
+    <li><a href="#get-与-set-表达式"><small>27.4</small> Get 与 Set 表达式</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="garbage-collection.html" title="垃圾回收" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="methods-and-initializers.html" title="方法与初始化器" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="garbage-collection.html" title="垃圾回收" class="prev">←</a>
+<a href="methods-and-initializers.html" title="方法与初始化器" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">类与实例<small>27</small></a></h3>
+
+<ul>
+    <li><a href="#类对象"><small>27.1</small> 类对象</a></li>
+    <li><a href="#类声明"><small>27.2</small> 类声明</a></li>
+    <li><a href="#类的实例"><small>27.3</small> 类的实例</a></li>
+    <li><a href="#get-与-set-表达式"><small>27.4</small> Get 与 Set 表达式</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="garbage-collection.html" title="垃圾回收" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="methods-and-initializers.html" title="方法与初始化器" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">27</div>
+  <h1>类与实例</h1>
+
+<blockquote>
+<p>对物件太过执着会毁掉你。只有——当你足够珍视一件事物时，它才会拥有自己的生命，不是吗？
+而事物——美丽的事物——存在的全部意义，不就是把你和某种更大的美联系起来吗？</p>
+<p><cite>唐娜·塔特（Donna Tartt），《金翅雀》</cite></p>
+</blockquote>
+<p>clox 里最后一块尚未实现的地盘就是面向对象编程。<span name="oop">面向对象编程</span>是一
+捆彼此缠绕的特性：类、实例、字段、方法、初始化器和继承。用相对高层的 Java，我们把这些
+塞进了两章里。现在我们要用 C 编码——那感觉就像用牙签搭埃菲尔铁塔的模型——于是我们打算
+用三章走完同一片地形。这让实现过程变成一次悠闲的散步。在<a href="closures.html">闭包</a>和<a href="garbage-collection.html">垃圾回收</a>这样
+辛苦的章节之后，你该歇口气了。事实上，从这里往后本书应该都会很轻松。</p>
+<aside name="oop">
+<p>对面向对象编程有强烈看法的人——也就是「所有人」——往往以为 OOP 就是某一串非常具体的
+语言特性，但实际上那是一整片有待探索的空间，每门语言都有自己的配料和配方。</p>
+<p>Self 有对象但没有类。CLOS 有方法但不把它们挂在特定的类上。C++ 最初没有运行时多态——
+没有虚方法。Python 有多重继承，Java 没有。Ruby 把方法挂在类上，但你也可以在单个对象上
+定义方法。</p>
+</aside>
+<p>本章我们覆盖前三个特性：类、实例和字段。这是面向对象中有状态的那一面。接下来两章，我们会
+把行为和代码复用挂到这些对象上。</p>
+<h2><a href="#类对象" id="类对象"><small>27&#8202;.&#8202;1</small>类对象</a></h2>
+<p>在基于类的面向对象语言里，一切都以类开始。它们定义了程序里存在哪些种类的对象，也是用来
+生产新实例的工厂。自下而上地说，我们先做它们的运行时表示，再把它接进语言里。</p>
+<p>走到这一步，我们给 VM 添加新对象类型的流程已经非常熟悉了。先从一个结构体开始。</p>
+<div class="codehilite"><pre class="insert-before">} ObjClosure;
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjClosure</em> 之后</div>
+<pre class="insert">
+
+<span class="k">typedef</span> <span class="k">struct</span> {
+  <span class="t">Obj</span> <span class="i">obj</span>;
+  <span class="t">ObjString</span>* <span class="i">name</span>;
+} <span class="t">ObjClass</span>;
+</pre><pre class="insert-after">
+
+ObjClosure* newClosure(ObjFunction* function);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjClosure</em> 之后</div>
+
+<p>在 Obj 头部之后，我们存放类的名字。严格说来用户的程序并不需要它，但它让我们能在运行时
+显示这个名字，用在堆栈跟踪之类的地方。</p>
+<p>这个新类型需要在 ObjType 枚举里加一个对应的分支。</p>
+<div class="codehilite"><pre class="insert-before">typedef enum {
+</pre><div class="source-file"><em>object.h</em><br>
+在枚举 <em>ObjType</em> 内</div>
+<pre class="insert">  <span class="a">OBJ_CLASS</span>,
+</pre><pre class="insert-after">  OBJ_CLOSURE,
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在枚举 <em>ObjType</em> 内</div>
+
+<p>这个类型还要配一对宏。先是测试一个对象的类型：</p>
+<div class="codehilite"><pre class="insert-before">#define OBJ_TYPE(value)        (AS_OBJ(value)-&gt;type)
+
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define IS_CLASS(value)        isObjType(value, OBJ_CLASS)</span>
+</pre><pre class="insert-after">#define IS_CLOSURE(value)      isObjType(value, OBJ_CLOSURE)
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>然后是把一个 Value 转型成 ObjClass 指针：</p>
+<div class="codehilite"><pre class="insert-before">#define IS_STRING(value)       isObjType(value, OBJ_STRING)
+
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))</span>
+</pre><pre class="insert-after">#define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>VM 用这个函数创建新的类对象：</p>
+<div class="codehilite"><pre class="insert-before">} ObjClass;
+
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjClass</em> 之后</div>
+<pre class="insert"><span class="t">ObjClass</span>* <span class="i">newClass</span>(<span class="t">ObjString</span>* <span class="i">name</span>);
+</pre><pre class="insert-after">ObjClosure* newClosure(ObjFunction* function);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjClass</em> 之后</div>
+
+<p>实现在这边：</p>
+<div class="codehilite"><div class="source-file"><em>object.c</em><br>
+加在 <em>allocateObject</em>() 之后</div>
+<pre><span class="t">ObjClass</span>* <span class="i">newClass</span>(<span class="t">ObjString</span>* <span class="i">name</span>) {
+  <span class="t">ObjClass</span>* <span class="i">klass</span> = <span class="a">ALLOCATE_OBJ</span>(<span class="t">ObjClass</span>, <span class="a">OBJ_CLASS</span>);
+  <span class="i">klass</span>-&gt;<span class="i">name</span> = <span class="i">name</span>;<span name="klass"> </span>
+  <span class="k">return</span> <span class="i">klass</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 加在 <em>allocateObject</em>() 之后</div>
+
+<p>基本上全是样板代码。它接收类名字符串并存下来。用户每声明一个新类，VM 就会创建一个新的
+这种 ObjClass 结构体来表示它。</p>
+<aside name="klass"><img src="image/classes-and-instances/klass.png" alt="用花哨童趣字体写的「Klass」。" />
+<p>我把这个变量命名为 &ldquo;klass&rdquo;，不只是为了让 VM 带点疯疯癫癫的「Kidz Korner」幼儿园感觉。
+它还让 clox 更容易以 C++ 编译过去，因为 &ldquo;class&rdquo; 在那里是保留字。</p>
+</aside>
+<p>当 VM 不再需要一个类时，它这样释放它：</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_CLASS</span>: {
+      <span class="a">FREE</span>(<span class="t">ObjClass</span>, <span class="i">object</span>);
+      <span class="k">break</span>;
+    }<span name="braces"> </span>
+</pre><pre class="insert-after">    case OBJ_CLOSURE: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<aside name="braces">
+<p>这里的花括号眼下是多余的，但下一章我们给这个 switch 分支加更多代码时它们就有用了。</p>
+</aside>
+<p>我们现在有内存管理器了，所以还需要支持追踪类对象。</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_CLASS</span>: {
+      <span class="t">ObjClass</span>* <span class="i">klass</span> = (<span class="t">ObjClass</span>*)<span class="i">object</span>;
+      <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">klass</span>-&gt;<span class="i">name</span>);
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_CLOSURE: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>当 GC 到达一个类对象时，它会标记类的名字，好让那个字符串也活着。</p>
+<p>VM 对一个类能做的最后一个操作是打印它。</p>
+<div class="codehilite"><pre class="insert-before">  switch (OBJ_TYPE(value)) {
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>printObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_CLASS</span>:
+      <span class="i">printf</span>(<span class="s">&quot;%s&quot;</span>, <span class="a">AS_CLASS</span>(<span class="i">value</span>)-&gt;<span class="i">name</span>-&gt;<span class="i">chars</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_CLOSURE:
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>printObject</em>() 内</div>
+
+<p>一个类只是报出自己的名字。</p>
+<h2><a href="#类声明" id="类声明"><small>27&#8202;.&#8202;2</small>类声明</a></h2>
+<p>运行时表示到手了，我们准备好给语言加上对类的支持。接下来我们进到解析器里。</p>
+<div class="codehilite"><pre class="insert-before">static void declaration() {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>declaration</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_CLASS</span>)) {
+    <span class="i">classDeclaration</span>();
+  } <span class="k">else</span> <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_FUN</span>)) {
+</pre><pre class="insert-after">    funDeclaration();
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>declaration</em>() 内, 替换 1 行</div>
+
+<p>类声明是语句，解析器靠开头的 <code>class</code> 关键字识别它。剩下的编译发生在这里：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>function</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">classDeclaration</span>() {
+  <span class="i">consume</span>(<span class="a">TOKEN_IDENTIFIER</span>, <span class="s">&quot;Expect class name.&quot;</span>);
+  <span class="t">uint8_t</span> <span class="i">nameConstant</span> = <span class="i">identifierConstant</span>(&amp;<span class="i">parser</span>.<span class="i">previous</span>);
+  <span class="i">declareVariable</span>();
+
+  <span class="i">emitBytes</span>(<span class="a">OP_CLASS</span>, <span class="i">nameConstant</span>);
+  <span class="i">defineVariable</span>(<span class="i">nameConstant</span>);
+
+  <span class="i">consume</span>(<span class="a">TOKEN_LEFT_BRACE</span>, <span class="s">&quot;Expect &#39;{&#39; before class body.&quot;</span>);
+  <span class="i">consume</span>(<span class="a">TOKEN_RIGHT_BRACE</span>, <span class="s">&quot;Expect &#39;}&#39; after class body.&quot;</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>function</em>() 之后</div>
+
+<p>紧跟在 <code>class</code> 关键字后面的是类名。我们取那个标识符，把它作为字符串加进外围函数的常量表。
+正如你刚看到的，打印一个类会显示它的名字，所以编译器需要把这个名字字符串塞到运行时能
+找到的地方。常量表就是干这个的办法。</p>
+<p>类的<span name="variable">名字</span>还用来把类对象绑定到一个同名的变量上。所以我们在
+吃掉它的词法单元之后立刻声明一个同名变量。</p>
+<aside name="variable">
+<p>我们本可以把类声明做成<strong>表达式</strong>而不是语句——说到底它本质上就是个产生值的字面量。
+那样用户就得自己显式地把类绑定到变量上，比如：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="t">Pie</span> = <span class="k">class</span> {};
+</pre></div>
+<p>有点像 lambda 函数，只不过对象是类。但既然我们总体上希望类是有名字的，把它们当作声明
+来处理也说得通。</p>
+</aside>
+<p>接下来，我们发射一条新指令，在运行时真正创建类对象。那条指令的操作数是类名在常量表里的
+索引。</p>
+<p>在那之后、编译类体之前，我们为类名定义变量。<strong>声明</strong>这个变量会把它加入作用域，但回想
+<a href="local-variables.html#另一个作用域边界情形">前面某一章</a>说的：在变量被<strong>定义</strong>之前，我们不能<strong>使用</strong>它。对类来说，我们在函数体
+之前就定义变量。这样用户就能在类自己各个方法体内部引用这个类了。这对工厂方法之类的东西
+很有用——它们要生产这个类的新实例。</p>
+<p>最后我们编译函数体。我们还没有方法，所以眼下它只是一对空花括号。Lox 不要求字段在类里
+声明，所以函数体——以及解析器——暂时到此为止。</p>
+<p>编译器正在发射一条新指令，我们来定义它。</p>
+<div class="codehilite"><pre class="insert-before">  OP_RETURN,
+</pre><div class="source-file"><em>chunk.h</em><br>
+在枚举 <em>OpCode</em> 内</div>
+<pre class="insert">  <span class="a">OP_CLASS</span>,
+</pre><pre class="insert-after">} OpCode;
+</pre></div>
+<div class="source-file-narrow"><em>chunk.h</em>, 在枚举 <em>OpCode</em> 内</div>
+
+<p>再加进反汇编器：</p>
+<div class="codehilite"><pre class="insert-before">    case OP_RETURN:
+      return simpleInstruction(&quot;OP_RETURN&quot;, offset);
+</pre><div class="source-file"><em>debug.c</em><br>
+在 <em>disassembleInstruction</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OP_CLASS</span>:
+      <span class="k">return</span> <span class="i">constantInstruction</span>(<span class="s">&quot;OP_CLASS&quot;</span>, <span class="i">chunk</span>, <span class="i">offset</span>);
+</pre><pre class="insert-after">    default:
+</pre></div>
+<div class="source-file-narrow"><em>debug.c</em>, 在 <em>disassembleInstruction</em>() 内</div>
+
+<p>对于一个看起来很大的特性来说，解释器侧的支持少得出奇。</p>
+<div class="codehilite"><pre class="insert-before">        break;
+      }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OP_CLASS</span>:
+        <span class="i">push</span>(<span class="a">OBJ_VAL</span>(<span class="i">newClass</span>(<span class="a">READ_STRING</span>())));
+        <span class="k">break</span>;
+</pre><pre class="insert-after">    }
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>我们从常量表里加载类名的字符串，传给 <code>newClass()</code>。它创建一个给定名字的新类对象。我们把
+它压栈，搞定。如果这个类被绑定在一个全局变量上，那么编译器对 <code>defineVariable()</code> 的调用
+会发射代码，把那个对象从栈里存进全局变量表。否则它正好就落在我们需要的位置：一个新
+<span name="local">局部</span>变量。</p>
+<aside name="local">
+<p>「局部」类——声明在函数体或块体内部的类——是个不寻常的概念。很多语言根本不允许。
+但既然 Lox 是一门动态类型的脚本语言，它对程序的顶层和函数、块的函数体一视同仁。类不过是
+另一种声明，既然你能在块里声明变量和函数，也就能在里面声明类。</p>
+</aside>
+<p>就是这样，我们的 VM 现在支持类了。你可以跑这个：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brioche</span> {}
+<span class="k">print</span> <span class="t">Brioche</span>;
+</pre></div>
+<p>不幸的是，你能对类做的事<strong>只</strong>有打印，所以接下来是让它们更有用。</p>
+<h2><a href="#类的实例" id="类的实例"><small>27&#8202;.&#8202;3</small>类的实例</a></h2>
+<p>类在一门语言里有两个主要用途：</p>
+<ul>
+<li>
+<p><strong>它们是你创建新实例的方式。</strong> 有时这需要一个 <code>new</code> 关键字，有时是对类对象的一次方法
+调用，但不管怎样你通常都要<strong>设法</strong>按名字提到那个类，才能拿到一个新实例。</p>
+</li>
+<li>
+<p><strong>它们容纳方法。</strong> 方法定义了这类对象的所有实例如何表现。</p>
+</li>
+</ul>
+<p>方法要等到下一章，所以现在我们只操心第一部分。类要能创建实例，我们首先需要实例的表示。</p>
+<div class="codehilite"><pre class="insert-before">} ObjClass;
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjClass</em> 之后</div>
+<pre class="insert">
+
+<span class="k">typedef</span> <span class="k">struct</span> {
+  <span class="t">Obj</span> <span class="i">obj</span>;
+  <span class="t">ObjClass</span>* <span class="i">klass</span>;
+  <span class="t">Table</span> <span class="i">fields</span>;<span name="fields"> </span>
+} <span class="t">ObjInstance</span>;
+</pre><pre class="insert-after">
+
+ObjClass* newClass(ObjString* name);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjClass</em> 之后</div>
+
+<p>实例知道自己的类——每个实例都有一个指针，指向它所属的那个类。本章我们不太用得上它，
+但加上方法之后它会变得至关重要。</p>
+<p>对这一章来说更重要的是实例怎么存自己的状态。Lox 允许用户在运行时自由地往实例上加
+字段。这意味着我们需要一种可以增长的存储机制。我们可以用动态数组，但我们还想
+尽快按名字查找字段。有一种数据结构正好完美契合「快速按名字访问一组值」——而且更方便的是，
+我们已经把它实现过了。每个实例用一张哈希表存自己的字段。</p>
+<aside name="fields">
+<p>能在运行时自由地给对象加字段，这是大多数动态语言与静态语言之间一个很大的实际差异。
+静态类型语言通常要求字段显式声明。这样编译器确切知道每个实例有哪些字段，可以据此确定
+每个实例需要多少内存，以及每个字段在这块内存中的偏移量。</p>
+<p>在 Lox 和其他动态语言里，访问一个字段通常是一次哈希表查找。是常数时间，但开销仍然不小。在 C++ 这样的语言里，访问字段跟用一个整数常量去偏移指针一样快。</p>
+</aside>
+<p>我们只需要加一个 include，就搞定了。</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;chunk.h&quot;
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#include &quot;table.h&quot;</span>
+</pre><pre class="insert-after">#include &quot;value.h&quot;
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>这个新结构体要配一个新的对象类型。</p>
+<div class="codehilite"><pre class="insert-before">  OBJ_FUNCTION,
+</pre><div class="source-file"><em>object.h</em><br>
+在枚举 <em>ObjType</em> 内</div>
+<pre class="insert">  <span class="a">OBJ_INSTANCE</span>,
+</pre><pre class="insert-after">  OBJ_NATIVE,
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在枚举 <em>ObjType</em> 内</div>
+
+<p>这里我想放慢一点，因为 Lox 这个<strong>语言</strong>对「类型」的理解，和 VM 这个<strong>实现</strong>对「类型」的
+理解，会以令人困惑的方式彼此错位。在构成 clox 的 C 代码里，有若干种不同的 Obj——ObjString、
+ObjClosure 等等。每一种都有自己的内部表示和语义。</p>
+<p>在 Lox 这个<strong>语言</strong>里，用户可以定义自己的类——比如 Cake 和 Pie——然后创建这些类的实例。
+从用户的视角看，Cake 的实例和 Pie 的实例是不同类型的对象。但在 VM 的视角里，用户定义的
+每一个类都只是另一个 ObjClass 类型的值。同样地，用户程序里的每个实例，不管它是哪个类的
+实例，都是一个 ObjInstance。这一个 VM 对象类型就覆盖了所有类的实例。这两个世界之间大致
+这样映射：</p><img src="image/classes-and-instances/lox-clox.png" alt="一组类声明与实例，以及各自映射到的运行时表示。" />
+<p>懂了吗？好，回到实现。我们照例拿到我们的宏。</p>
+<div class="codehilite"><pre class="insert-before">#define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define IS_INSTANCE(value)     isObjType(value, OBJ_INSTANCE)</span>
+</pre><pre class="insert-after">#define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>还有：</p>
+<div class="codehilite"><pre class="insert-before">#define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))</span>
+</pre><pre class="insert-after">#define AS_NATIVE(value) \
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>由于字段是在实例创建之后才加的，那个「构造函数」只需要知道类。</p>
+<div class="codehilite"><pre class="insert-before">ObjFunction* newFunction();
+</pre><div class="source-file"><em>object.h</em><br>
+加在 <em>newFunction</em>() 之后</div>
+<pre class="insert"><span class="t">ObjInstance</span>* <span class="i">newInstance</span>(<span class="t">ObjClass</span>* <span class="i">klass</span>);
+</pre><pre class="insert-after">ObjNative* newNative(NativeFn function);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在 <em>newFunction</em>() 之后</div>
+
+<p>我们在这里实现这个函数：</p>
+<div class="codehilite"><div class="source-file"><em>object.c</em><br>
+加在 <em>newFunction</em>() 之后</div>
+<pre><span class="t">ObjInstance</span>* <span class="i">newInstance</span>(<span class="t">ObjClass</span>* <span class="i">klass</span>) {
+  <span class="t">ObjInstance</span>* <span class="i">instance</span> = <span class="a">ALLOCATE_OBJ</span>(<span class="t">ObjInstance</span>, <span class="a">OBJ_INSTANCE</span>);
+  <span class="i">instance</span>-&gt;<span class="i">klass</span> = <span class="i">klass</span>;
+  <span class="i">initTable</span>(&amp;<span class="i">instance</span>-&gt;<span class="i">fields</span>);
+  <span class="k">return</span> <span class="i">instance</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 加在 <em>newFunction</em>() 之后</div>
+
+<p>我们存下对实例所属类的引用。然后把字段表初始化成一张空哈希表。一个崭新的小对象诞生了！</p>
+<p>在实例生命周期更伤感的那一头，它被释放。</p>
+<div class="codehilite"><pre class="insert-before">      FREE(ObjFunction, object);
+      break;
+    }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_INSTANCE</span>: {
+      <span class="t">ObjInstance</span>* <span class="i">instance</span> = (<span class="t">ObjInstance</span>*)<span class="i">object</span>;
+      <span class="i">freeTable</span>(&amp;<span class="i">instance</span>-&gt;<span class="i">fields</span>);
+      <span class="a">FREE</span>(<span class="t">ObjInstance</span>, <span class="i">object</span>);
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_NATIVE:
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<p>实例拥有自己的字段表，所以释放实例时我们也释放那张表。我们不显式释放表<strong>里</strong>的条目，
+因为那些对象可能还有其他引用。垃圾回收器会替我们处理那些。这里我们只释放表本身的条目
+数组。</p>
+<p>说到垃圾回收器，它需要支持追踪实例。</p>
+<div class="codehilite"><pre class="insert-before">      markArray(&amp;function-&gt;chunk.constants);
+      break;
+    }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_INSTANCE</span>: {
+      <span class="t">ObjInstance</span>* <span class="i">instance</span> = (<span class="t">ObjInstance</span>*)<span class="i">object</span>;
+      <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">instance</span>-&gt;<span class="i">klass</span>);
+      <span class="i">markTable</span>(&amp;<span class="i">instance</span>-&gt;<span class="i">fields</span>);
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_UPVALUE:
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>如果实例还活着，我们就得让它的类也留着。此外，我们得让实例字段引用的每个对象都活着。
+大多数不是根的活对象之所以可达，就是因为某个实例在某个字段里引用了那个对象。幸运的是，
+我们已经有一个好用的 <code>markTable()</code> 函数，追踪起来很轻松。</p>
+<p>没那么关键但仍然重要的是打印。</p>
+<div class="codehilite"><pre class="insert-before">      break;
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>printObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_INSTANCE</span>:
+      <span class="i">printf</span>(<span class="s">&quot;%s instance&quot;</span>,
+             <span class="a">AS_INSTANCE</span>(<span class="i">value</span>)-&gt;<span class="i">klass</span>-&gt;<span class="i">name</span>-&gt;<span class="i">chars</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_NATIVE:
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>printObject</em>() 内</div>
+
+<p><span name="print">一个</span>实例会打印自己的名字，后面跟上 &ldquo;instance&rdquo;。（&ldquo;instance&rdquo; 这部分主要是为了让类和实例
+打印出来不一样。）</p>
+<aside name="print">
+<p>大多数面向对象语言允许类定义某种 <code>toString()</code> 方法，让类指定它的实例怎么转换成字符串
+并被打印。如果 Lox 不那么像玩具语言，我也会想支持这个。</p>
+</aside>
+<p>真正好玩的部分在解释器那边。Lox 没有专门的 <code>new</code> 关键字。创建一个类实例的方式，就是像
+调用函数一样调用这个类本身。运行时已经支持函数调用，而且它会检查被调用对象的类型，
+确保用户不会去调用一个数字或其他无效类型。</p>
+<p>我们给那个运行时检查加一个新的分支。</p>
+<div class="codehilite"><pre class="insert-before">    switch (OBJ_TYPE(callee)) {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>callValue</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OBJ_CLASS</span>: {
+        <span class="t">ObjClass</span>* <span class="i">klass</span> = <span class="a">AS_CLASS</span>(<span class="i">callee</span>);
+        <span class="i">vm</span>.<span class="i">stackTop</span>[-<span class="i">argCount</span> - <span class="n">1</span>] = <span class="a">OBJ_VAL</span>(<span class="i">newInstance</span>(<span class="i">klass</span>));
+        <span class="k">return</span> <span class="k">true</span>;
+      }
+</pre><pre class="insert-after">      case OBJ_CLOSURE:
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>callValue</em>() 内</div>
+
+<p>如果被调用的值——也就是求值左括号左边那个表达式得到的对象——是一个类，我们就把它当作
+一次构造函数调用。我们<span name="args">创建</span>一个被调用类的新实例，把结果存进栈里。</p>
+<aside name="args">
+<p>目前我们忽略传给这次调用的任何实参。等下一章加上初始化器支持时，我们会回来再看这段代码。</p>
+</aside>
+<p>我们又前进了一步。现在我们能定义类、创建它们的实例了。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brioche</span> {}
+<span class="k">print</span> <span class="t">Brioche</span>();
+</pre></div>
+<p>注意第二行 <code>Brioche</code> 后面现在有了括号。它会打印 &ldquo;Brioche instance&rdquo;。</p>
+<h2><a href="#get-与-set-表达式" id="get-与-set-表达式"><small>27&#8202;.&#8202;4</small>Get 与 Set 表达式</a></h2>
+<p>我们针对实例的对象表示已经能存状态了，所以剩下的就是把这份功能暴露给用户。字段用 get
+表达式和 set 表达式来访问和修改。Lox 也不甘落后，采用了经典的「点号」语法：</p>
+<div class="codehilite"><pre><span class="i">eclair</span>.<span class="i">filling</span> = <span class="s">&quot;pastry creme&quot;</span>;
+<span class="k">print</span> <span class="i">eclair</span>.<span class="i">filling</span>;
+</pre></div>
+<p>那个句点——献给我的英语朋友们，它叫 full stop——作用<span name="sort">有点像</span>一个中缀运算符。左边有一个
+先求值、产生一个实例的表达式。之后是 <code>.</code>，再跟一个字段名。既然有一个前置操作数，我们把
+它作为中缀表达式挂进解析表。</p>
+<aside name="sort">
+<p>我说「有点像」，是因为 <code>.</code> 右边不是表达式，而是一个单独的标识符，它的语义由 get 或 set
+表达式本身处理。它其实更接近后缀表达式。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">  [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
+</pre><div class="source-file"><em>compiler.c</em><br>
+替换 1 行</div>
+<pre class="insert">  [<span class="a">TOKEN_DOT</span>]           = {<span class="a">NULL</span>,     <span class="i">dot</span>,    <span class="a">PREC_CALL</span>},
+</pre><pre class="insert-after">  [TOKEN_MINUS]         = {unary,    binary, PREC_TERM},
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 替换 1 行</div>
+
+<p>和其他语言一样，<code>.</code> 运算符绑定得很紧，优先级和函数调用里的圆括号一样高。解析器吃掉点号
+词法单元之后，会分派到一个新的解析函数。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>call</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">dot</span>(<span class="t">bool</span> <span class="i">canAssign</span>) {
+  <span class="i">consume</span>(<span class="a">TOKEN_IDENTIFIER</span>, <span class="s">&quot;Expect property name after &#39;.&#39;.&quot;</span>);
+  <span class="t">uint8_t</span> <span class="i">name</span> = <span class="i">identifierConstant</span>(&amp;<span class="i">parser</span>.<span class="i">previous</span>);
+
+  <span class="k">if</span> (<span class="i">canAssign</span> &amp;&amp; <span class="i">match</span>(<span class="a">TOKEN_EQUAL</span>)) {
+    <span class="i">expression</span>();
+    <span class="i">emitBytes</span>(<span class="a">OP_SET_PROPERTY</span>, <span class="i">name</span>);
+  } <span class="k">else</span> {
+    <span class="i">emitBytes</span>(<span class="a">OP_GET_PROPERTY</span>, <span class="i">name</span>);
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>call</em>() 之后</div>
+
+<p>解析器预期在点号后面紧接着找到一个<span name="prop">属性</span>名。我们把那个词法单元的词素
+作为字符串加载进常量表，好让名字在运行时可用。</p>
+<aside name="prop">
+<p>编译器这里用「属性」而不是「字段」，别忘了，Lox 还允许你用点号语法访问一个方法而不调用
+它。「属性」是我们用来指代实例上任何可访问的具名实体的总称。字段是由实例状态支撑的那
+一部分属性。</p>
+</aside>
+<p>我们有两条新的表达式形式——getter 和 setter——都由这一个函数处理。如果我们在字段名后面
+看到一个等号，那必然是一条给字段赋值的 set 表达式。但我们并不<strong>总是</strong>允许编译字段后面
+的等号。考虑：</p>
+<div class="codehilite"><pre><span class="i">a</span> + <span class="i">b</span>.<span class="i">c</span> = <span class="n">3</span>
+</pre></div>
+<p>按 Lox 的文法，这在语法上是非法的，也就是说我们的 Lox 实现有责任检测并报告这个错误。
+如果 <code>dot()</code> 默默地把 <code>= 3</code> 那部分也解析了，我们就会错误地把这段代码理解成用户写了：</p>
+<div class="codehilite"><pre><span class="i">a</span> + (<span class="i">b</span>.<span class="i">c</span> = <span class="n">3</span>)
+</pre></div>
+<p>问题在于，set 表达式里 <code>=</code> 那侧的优先级比 <code>.</code> 那部分低得多。解析器可能在优先级太高、
+不允许出现 setter 的语境里调用 <code>dot()</code>。为了避免错误地放行这种情况，我们只在
+<code>canAssign</code> 为真时才解析并编译等号那部分。如果 <code>canAssign</code> 为假时出现了等号词法单元，
+<code>dot()</code> 会原样留下它然后返回。那种情况下，编译器最终会退回到 <code>parsePrecedence()</code>，
+它停在这个意料之外的 <code>=</code> 上（它仍是下一个词法单元）并报告错误。</p>
+<p>如果我们在<strong>确实</strong>允许等号的语境里找到了一个 <code>=</code>，我们就编译它后面那个表达式。之后我们
+发射一条新的 <span name="set"><code>OP_SET_PROPERTY</code></span> 指令。它带一个操作数，表示属性名
+在常量表里的索引。如果我们没有编译出 set 表达式，就假定它是 getter，发射一条
+<code>OP_GET_PROPERTY</code> 指令，它同样带一个属性名的操作数。</p>
+<aside name="set">
+<p>你不能<strong>设置</strong>一个非字段的属性，所以我想那条指令本来也可以叫 <code>OP_SET_FIELD</code>，但我觉得
+跟 get 指令保持一致看起来更顺眼。</p>
+</aside>
+<p>现在正是定义这两条新指令的好时机。</p>
+<div class="codehilite"><pre class="insert-before">  OP_SET_UPVALUE,
+</pre><div class="source-file"><em>chunk.h</em><br>
+在枚举 <em>OpCode</em> 内</div>
+<pre class="insert">  <span class="a">OP_GET_PROPERTY</span>,
+  <span class="a">OP_SET_PROPERTY</span>,
+</pre><pre class="insert-after">  OP_EQUAL,
+</pre></div>
+<div class="source-file-narrow"><em>chunk.h</em>, 在枚举 <em>OpCode</em> 内</div>
+
+<p>再加上反汇编支持：</p>
+<div class="codehilite"><pre class="insert-before">      return byteInstruction(&quot;OP_SET_UPVALUE&quot;, chunk, offset);
+</pre><div class="source-file"><em>debug.c</em><br>
+在 <em>disassembleInstruction</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OP_GET_PROPERTY</span>:
+      <span class="k">return</span> <span class="i">constantInstruction</span>(<span class="s">&quot;OP_GET_PROPERTY&quot;</span>, <span class="i">chunk</span>, <span class="i">offset</span>);
+    <span class="k">case</span> <span class="a">OP_SET_PROPERTY</span>:
+      <span class="k">return</span> <span class="i">constantInstruction</span>(<span class="s">&quot;OP_SET_PROPERTY&quot;</span>, <span class="i">chunk</span>, <span class="i">offset</span>);
+</pre><pre class="insert-after">    case OP_EQUAL:
+</pre></div>
+<div class="source-file-narrow"><em>debug.c</em>, 在 <em>disassembleInstruction</em>() 内</div>
+
+<h3><a href="#解释-getter-与-setter-表达式" id="解释-getter-与-setter-表达式"><small>27&#8202;.&#8202;4&#8202;.&#8202;1</small>解释 getter 与 setter 表达式</a></h3>
+<p>滑到运行时，我们先从 get 表达式开始，因为它稍微简单一点。</p>
+<div class="codehilite"><pre class="insert-before">      }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OP_GET_PROPERTY</span>: {
+        <span class="t">ObjInstance</span>* <span class="i">instance</span> = <span class="a">AS_INSTANCE</span>(<span class="i">peek</span>(<span class="n">0</span>));
+        <span class="t">ObjString</span>* <span class="i">name</span> = <span class="a">READ_STRING</span>();
+
+        <span class="t">Value</span> <span class="i">value</span>;
+        <span class="k">if</span> (<span class="i">tableGet</span>(&amp;<span class="i">instance</span>-&gt;<span class="i">fields</span>, <span class="i">name</span>, &amp;<span class="i">value</span>)) {
+          <span class="i">pop</span>(); <span class="c">// 实例。</span>
+          <span class="i">push</span>(<span class="i">value</span>);
+          <span class="k">break</span>;
+        }
+      }
+</pre><pre class="insert-after">      case OP_EQUAL: {
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>当解释器执行到这条指令时，点号左边的表达式已经求过值，结果实例在栈顶。我们从常量池里
+读出字段名，在实例的字段表里查它。如果哈希表里有那个名字的条目，我们把实例弹出来，
+把条目的值作为结果压栈。</p>
+<p>当然，字段可能并不存在。在 Lox 里我们把这定义为运行时错误。所以我们加一个检查，
+一旦发生就中止。</p>
+<div class="codehilite"><pre class="insert-before">          push(value);
+          break;
+        }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">
+
+        <span class="i">runtimeError</span>(<span class="s">&quot;Undefined property &#39;%s&#39;.&quot;</span>, <span class="i">name</span>-&gt;<span class="i">chars</span>);
+        <span class="k">return</span> <span class="a">INTERPRET_RUNTIME_ERROR</span>;
+</pre><pre class="insert-after">      }
+      case OP_EQUAL: {
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p><span name="field">还有</span>另一个你大概已经注意到的失败模式要处理。上面那段代码假定
+点号左边的表达式确实求值成了 ObjInstance。但没有东西能阻止用户这样写：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">obj</span> = <span class="s">&quot;not an instance&quot;</span>;
+<span class="k">print</span> <span class="i">obj</span>.<span class="i">field</span>;
+</pre></div>
+<p>用户的程序是错的，但 VM 仍然得有几分体面地处理它。现在它会把 ObjString 的那些位误当成
+ObjInstance，然后——我也不知道——着火什么的，反正绝对不体面。</p>
+<p>在 Lox 里，只有实例被允许拥有字段。你没法往字符串或数字上塞字段。所以我们在访问任何
+字段之前，得先检查这个值是不是实例。</p>
+<aside name="field">
+<p>Lox <strong>可以</strong>支持给其他类型的值加字段。这是我们的语言，我们想怎样就怎样。但这很可能是个
+坏主意。它会以损害性能的方式大大复杂化实现——比如说，字符串驻留会变得难得多。</p>
+<p>另外，它还会引出关于值的相等性与同一性的棘手语义问题。如果我给数字 <code>3</code> 挂上一个字段，
+那 <code>1 + 2</code> 的结果也有那个字段吗？如果有，实现要怎么追踪这一点？如果没有，那两个算出来的
+「三」还算是相等的吗？</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">      case OP_GET_PROPERTY: {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">        <span class="k">if</span> (!<span class="a">IS_INSTANCE</span>(<span class="i">peek</span>(<span class="n">0</span>))) {
+          <span class="i">runtimeError</span>(<span class="s">&quot;Only instances have properties.&quot;</span>);
+          <span class="k">return</span> <span class="a">INTERPRET_RUNTIME_ERROR</span>;
+        }
+
+</pre><pre class="insert-after">        ObjInstance* instance = AS_INSTANCE(peek(0));
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>如果栈上的值不是实例，我们报告运行时错误并安全退出。</p>
+<p>当然，在实例都没有任何字段的时候，get 表达式也不怎么有用。为此我们需要 setter。</p>
+<div class="codehilite"><pre class="insert-before">        return INTERPRET_RUNTIME_ERROR;
+      }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OP_SET_PROPERTY</span>: {
+        <span class="t">ObjInstance</span>* <span class="i">instance</span> = <span class="a">AS_INSTANCE</span>(<span class="i">peek</span>(<span class="n">1</span>));
+        <span class="i">tableSet</span>(&amp;<span class="i">instance</span>-&gt;<span class="i">fields</span>, <span class="a">READ_STRING</span>(), <span class="i">peek</span>(<span class="n">0</span>));
+        <span class="t">Value</span> <span class="i">value</span> = <span class="i">pop</span>();
+        <span class="i">pop</span>();
+        <span class="i">push</span>(<span class="i">value</span>);
+        <span class="k">break</span>;
+      }
+</pre><pre class="insert-after">      case OP_EQUAL: {
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>这比 <code>OP_GET_PROPERTY</code> 稍微复杂一点。这条指令执行时，栈顶是那个要被设置字段的实例，
+它上面是要被存进去的值。和之前一样，我们读出指令的操作数，找到字段名字符串。用它把栈顶
+的值存进实例的字段表。</p>
+<p>之后是一些<span name="stack">栈</span>上的腾挪。我们先把存好的值弹出来，再弹出实例，
+最后把值压回去。换句话说，我们把栈上的<strong>第二个</strong>元素移除，而把栈顶留着不动。setter 本身
+是一个表达式，它的结果就是被赋的值，所以我们需要把那个值留在栈上。我说的就是这个意思：</p>
+<aside name="stack">
+<p>栈操作是这样：</p><img src="image/classes-and-instances/stack.png" alt="先弹出两个值，再把第一个值压回栈上。" />
+</aside>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Toast</span> {}
+<span class="k">var</span> <span class="i">toast</span> = <span class="t">Toast</span>();
+<span class="k">print</span> <span class="i">toast</span>.<span class="i">jam</span> = <span class="s">&quot;grape&quot;</span>; <span class="c">// Prints &quot;grape&quot;.</span>
+</pre></div>
+<p>和读取字段不同，我们不用担心哈希表里没有那个字段。setter 会在需要时隐式创建字段。我们
+确实要处理的是用户错误地想往一个不是实例的值上存字段。</p>
+<div class="codehilite"><pre class="insert-before">      case OP_SET_PROPERTY: {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">        <span class="k">if</span> (!<span class="a">IS_INSTANCE</span>(<span class="i">peek</span>(<span class="n">1</span>))) {
+          <span class="i">runtimeError</span>(<span class="s">&quot;Only instances have fields.&quot;</span>);
+          <span class="k">return</span> <span class="a">INTERPRET_RUNTIME_ERROR</span>;
+        }
+
+</pre><pre class="insert-after">        ObjInstance* instance = AS_INSTANCE(peek(1));
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>和 get 表达式完全一样，我们检查值的类型，无效就报运行时错误。至此，Lox 对面向对象编程
+的支持中，有状态的那一面就到位了。试试看：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Pair</span> {}
+
+<span class="k">var</span> <span class="i">pair</span> = <span class="t">Pair</span>();
+<span class="i">pair</span>.<span class="i">first</span> = <span class="n">1</span>;
+<span class="i">pair</span>.<span class="i">second</span> = <span class="n">2</span>;
+<span class="k">print</span> <span class="i">pair</span>.<span class="i">first</span> + <span class="i">pair</span>.<span class="i">second</span>; <span class="c">// 3.</span>
+</pre></div>
+<p>这其实不太让人觉得<strong>面向对象</strong>。它更像是 C 的一个古怪的动态类型变体，对象只是些松散的、
+类似结构体的数据包。算是某种动态的过程式语言。但这在表达力上是一大步。我们的 Lox 实现
+现在让用户可以自由地把数据聚合成更大的单元。下一章我们会给这些惰性团块注入生命。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>访问对象上不存在的字段会立刻中止整个 VM。用户没法从这个运行时错误里恢复，也没有
+任何办法在尝试访问<strong>之前</strong>知道字段是否存在。用户只能自己保证只读有效字段。</p>
+<p>其他动态类型语言怎么处理缺失的字段？你觉得 Lox 应该怎么做？实现你的方案。</p>
+</li>
+<li>
+<p>字段在运行时按<strong>字符串</strong>名字访问。但那个名字必须始终以<strong>标识符词法单元</strong>的形式直接出现在
+源代码里。用户程序不能命令式地构造一个字符串值、再把它当作字段名。你觉得他们应该
+能做到吗？设计一个支持这件事的语言特性并实现它。</p>
+</li>
+<li>
+<p>反过来，Lox 没有任何办法从实例上<strong>移除</strong>字段。你可以把字段的值设成 <code>nil</code>，但哈希表里
+的条目还在那儿。其他语言怎么处理这个问题？为 Lox 选择并实现一种策略。</p>
+</li>
+<li>
+<p>因为字段在运行时按名字访问，操作实例状态很慢。技术上这是常数时间操作——多亏了哈希表
+——但常数因子相当大。这是动态语言比静态类型语言慢的一个主要原因。</p>
+<p>动态类型语言的精巧实现是怎么应对并优化这一点的？</p>
+</li>
+</ol>
+</div>
+
+<footer>
+<a href="methods-and-initializers.html" class="next">
+  下一章：&ldquo;方法与初始化器&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

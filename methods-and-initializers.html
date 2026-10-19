@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>方法与初始化器 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">方法与初始化器<small>28</small></a></h3>
+
+<ul>
+    <li><a href="#方法声明"><small>28.1</small> 方法声明</a></li>
+    <li><a href="#方法引用"><small>28.2</small> 方法引用</a></li>
+    <li><a href="#this"><small>28.3</small> This</a></li>
+    <li><a href="#实例初始化器"><small>28.4</small> 实例初始化器</a></li>
+    <li><a href="#优化的调用"><small>28.5</small> 优化的调用</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>新意预算</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="classes-and-instances.html" title="类与实例" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="superclasses.html" title="超类" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="classes-and-instances.html" title="类与实例" class="prev">←</a>
+<a href="superclasses.html" title="超类" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">方法与初始化器<small>28</small></a></h3>
+
+<ul>
+    <li><a href="#方法声明"><small>28.1</small> 方法声明</a></li>
+    <li><a href="#方法引用"><small>28.2</small> 方法引用</a></li>
+    <li><a href="#this"><small>28.3</small> This</a></li>
+    <li><a href="#实例初始化器"><small>28.4</small> 实例初始化器</a></li>
+    <li><a href="#优化的调用"><small>28.5</small> 优化的调用</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>新意预算</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="classes-and-instances.html" title="类与实例" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="superclasses.html" title="超类" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">28</div>
+  <h1>方法与初始化器</h1>
+
+<blockquote>
+<p>一旦站上舞池，就只剩跳舞这一件事可做。</p>
+<p><cite>翁贝托·埃科，《洛阿娜女王的神秘火焰》</cite></p>
+</blockquote>
+<p>是时候让我们的虚拟机用行为把这些初生的对象激活起来了。这意味着方法和方法调用。而既然初始化器是
+一种特殊的方法，当然也算在内。</p>
+<p>这一整套，全都是上一趟 jlox 之旅走过的熟路。这一趟真正的新东西，是一项重要
+的优化：我们会让方法调用比基准性能快上七倍以上。不过在享受那份乐趣之前，我们得先把基本
+功能跑通。</p>
+<h2><a href="#方法声明" id="方法声明"><small>28&#8202;.&#8202;1</small>方法声明</a></h2>
+<p>我们没法在还没有方法调用之前优化方法调用，也没法在还没有方法之前调用方法，所以从声明开始。</p>
+<h3><a href="#表示方法" id="表示方法"><small>28&#8202;.&#8202;1&#8202;.&#8202;1</small>表示方法</a></h3>
+<p>我们通常是从编译器开始的，但这回我们先把对象模型搞定。clox 里方法的运行时表示跟 jlox
+差不多。每个类存一张方法的哈希表。键是方法名，每个值是方法体的 ObjClosure。</p>
+<div class="codehilite"><pre class="insert-before">typedef struct {
+  Obj obj;
+  ObjString* name;
+</pre><div class="source-file"><em>object.h</em><br>
+在结构体 <em>ObjClass</em> 内</div>
+<pre class="insert">  <span class="t">Table</span> <span class="i">methods</span>;
+</pre><pre class="insert-after">} ObjClass;
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在结构体 <em>ObjClass</em> 内</div>
+
+<p>一个崭新的类从一张空方法表开始。</p>
+<div class="codehilite"><pre class="insert-before">  klass-&gt;name = name;<span name="klass"> </span>
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>newClass</em>() 内</div>
+<pre class="insert">  <span class="i">initTable</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>);
+</pre><pre class="insert-after">  return klass;
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>newClass</em>() 内</div>
+
+<p>ObjClass 结构体拥有这张表的内存，所以当内存管理器回收一个类时，这张表也该一起释放。</p>
+<div class="codehilite"><pre class="insert-before">    case OBJ_CLASS: {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert">      <span class="t">ObjClass</span>* <span class="i">klass</span> = (<span class="t">ObjClass</span>*)<span class="i">object</span>;
+      <span class="i">freeTable</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>);
+</pre><pre class="insert-after">      FREE(ObjClass, object);
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<p>说到内存管理器，GC 需要追踪类、走进它的方法表。如果一个类还可达（很可能是通过某个实例），
+那它的所有方法当然也得留下来。</p>
+<div class="codehilite"><pre class="insert-before">      markObject((Obj*)klass-&gt;name);
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">      <span class="i">markTable</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>);
+</pre><pre class="insert-after">      break;
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>我们用的是已有的 <code>markTable()</code> 函数，它会追踪每个表条目的键字符串和值。</p>
+<p>从 jlox 过来，给类存方法相当熟悉。不同的部分在于这张表怎么被填满。上一个解释器能拿到整个
+类声明的 AST 节点，以及它包含的所有方法。运行时，解释器只要遍历那份声明列表就行。</p>
+<p>现在，编译器想交给运行时的每一点信息，都必须挤进一条扁平的字节码指令序列里。我们怎么
+才能把一个类声明——它可能包含任意多的方法——表示成字节码？我们跳到编译器那边看看。</p>
+<h3><a href="#编译方法声明" id="编译方法声明"><small>28&#8202;.&#8202;1&#8202;.&#8202;2</small>编译方法声明</a></h3>
+<p>上一章留给我们一个能解析类、但只允许空函数体的编译器。现在我们插一点代码，编译花括号
+之间的那一串方法声明。</p>
+<div class="codehilite"><pre class="insert-before">  consume(TOKEN_LEFT_BRACE, &quot;Expect '{' before class body.&quot;);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>classDeclaration</em>() 内</div>
+<pre class="insert">  <span class="k">while</span> (!<span class="i">check</span>(<span class="a">TOKEN_RIGHT_BRACE</span>) &amp;&amp; !<span class="i">check</span>(<span class="a">TOKEN_EOF</span>)) {
+    <span class="i">method</span>();
+  }
+</pre><pre class="insert-after">  consume(TOKEN_RIGHT_BRACE, &quot;Expect '}' after class body.&quot;);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>classDeclaration</em>() 内</div>
+
+<p>Lox 没有字段声明，所以类体末尾那个右花括号之前的一切都必定是方法。碰到最后那个花括号、
+或者读到文件末尾，我们就停止编译方法。后一项检查保证了一件事：万一用户不小心忘了写右花括号，
+编译器不会卡在死循环里。</p>
+<p>编译类声明的棘手之处在于，一个类可能声明任意多个方法。运行时总得想办法把它们全查出来
+并绑定。这要塞进单条 <code>OP_CLASS</code> 指令可就太多了。所以我们为一个类声明生成的字节码，会把这个
+过程拆成一<span name="series"><strong>连串</strong></span>指令。编译器本来就会发射一条 <code>OP_CLASS</code> 指令，
+创建新的空 ObjClass 对象。然后它发射指令，把这个类以它的名字存进一个变量。</p>
+<aside name="series">
+<p>闭包那里我们做过类似的事。<code>OP_CLOSURE</code> 指令需要知道每个被捕获 upvalue 的类型和索引。我们用跟在
+主 <code>OP_CLOSURE</code> 指令后面的一串伪指令来编码它——本质上就是数量可变的操作数。虚拟机在解释
+<code>OP_CLOSURE</code> 指令时，会立刻把那些多出来的字节全处理掉。</p>
+<p>这回我们的做法稍有不同，因为从虚拟机的视角看，每条定义方法的指令都是一个独立的操作。两种
+做法都能行。变长伪指令可能稍微快那么一点点，但类声明很少出现在热循环里，所以差别不大。</p>
+</aside>
+<p>现在，对每一条方法声明，我们发射一条新的 <code>OP_METHOD</code> 指令，往那个类里加一个方法。当所有
+<code>OP_METHOD</code> 指令都执行完，我们就得到了一个成型的类。用户眼里一个类声明是一个原子操作，
+虚拟机却把它实现成了一连串修改。</p>
+<p>要定义一个新方法，虚拟机需要三样东西：</p>
+<ol>
+<li>
+<p>方法的名字。</p>
+</li>
+<li>
+<p>方法体的闭包。</p>
+</li>
+<li>
+<p>要把方法绑定到哪个类上。</p>
+</li>
+</ol>
+<p>我们逐步写出编译器代码，看看这三样东西怎么一路传到运行时。从这里开始：</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>function</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">method</span>() {
+  <span class="i">consume</span>(<span class="a">TOKEN_IDENTIFIER</span>, <span class="s">&quot;Expect method name.&quot;</span>);
+  <span class="t">uint8_t</span> <span class="i">constant</span> = <span class="i">identifierConstant</span>(&amp;<span class="i">parser</span>.<span class="i">previous</span>);
+  <span class="i">emitBytes</span>(<span class="a">OP_METHOD</span>, <span class="i">constant</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>function</em>() 之后</div>
+
+<p>跟 <code>OP_GET_PROPERTY</code> 以及其他在运行时需要名字的指令一样，编译器把方法名词法单元的词素加进
+常量表，拿回一个表索引。然后我们发射一条 <code>OP_METHOD</code> 指令，把这个索引作为操作数。这就是
+名字。接下来是方法体：</p>
+<div class="codehilite"><pre class="insert-before">  uint8_t constant = identifierConstant(&amp;parser.previous);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>method</em>() 内</div>
+<pre class="insert">
+
+  <span class="t">FunctionType</span> <span class="i">type</span> = <span class="a">TYPE_FUNCTION</span>;
+  <span class="i">function</span>(<span class="i">type</span>);
+</pre><pre class="insert-after">  emitBytes(OP_METHOD, constant);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>method</em>() 内</div>
+
+<p>我们用编译函数声明时写的那个 <code>function()</code> 辅助函数。那个工具函数会编译后面的参数列表和
+函数体，然后发射代码创建一个 ObjClosure 并把它留在栈顶。运行时会在那里找到这个闭包。</p>
+<p>最后是要绑定方法的那个类。虚拟机去哪里找它？遗憾的是，等我们执行到 <code>OP_METHOD</code> 指令时，
+我们并不知道它在哪里。它<span name="global">可能</span>在栈上——如果用户把类声明在一个
+局部作用域里的话。但一个顶层类声明最后会把 ObjClass 落到全局变量表里。</p>
+<aside name="global">
+<p>如果 Lox 只支持在顶层声明类，虚拟机就可以假定任何类都能直接从全局变量表里查到。可惜我们
+支持局部类，这种情形也得处理。</p>
+</aside>
+<p>别担心。编译器确实知道这个类的<strong>名字</strong>。我们可以在吃掉那个词法单元之后立刻把它捕获下来。</p>
+<div class="codehilite"><pre class="insert-before">  consume(TOKEN_IDENTIFIER, &quot;Expect class name.&quot;);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>classDeclaration</em>() 内</div>
+<pre class="insert">  <span class="t">Token</span> <span class="i">className</span> = <span class="i">parser</span>.<span class="i">previous</span>;
+</pre><pre class="insert-after">  uint8_t nameConstant = identifierConstant(&amp;parser.previous);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>classDeclaration</em>() 内</div>
+
+<p>而且我们知道，不可能有别的同名声明遮蔽这个类。所以我们走最省事的那条路：在开始绑定方法之前，
+发射必要的代码，把这个类重新加载到栈顶。</p>
+<div class="codehilite"><pre class="insert-before">  defineVariable(nameConstant);
+
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>classDeclaration</em>() 内</div>
+<pre class="insert">  <span class="i">namedVariable</span>(<span class="i">className</span>, <span class="k">false</span>);
+</pre><pre class="insert-after">  consume(TOKEN_LEFT_BRACE, &quot;Expect '{' before class body.&quot;);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>classDeclaration</em>() 内</div>
+
+<p>在编译类体之前，我们正好<span name="load">调用</span> <code>namedVariable()</code>。这个辅助函数生成
+代码，把指定名字的变量加载到栈上。然后我们编译那些方法。</p>
+<aside name="load">
+<p>前面那次 <code>defineVariable()</code> 调用已经把类弹出了栈，所以紧接着调用 <code>namedVariable()</code> 把它又
+加载回栈上，看起来很傻。为什么不干脆一开始就让它在栈上？我们可以，但<a href="superclasses.html">下一章</a>我们要
+在这两次调用之间插入代码来支持继承。到那时候，类不在栈上待着会更简单。</p>
+</aside>
+<p>这意味着，执行每一条 <code>OP_METHOD</code> 指令时，栈顶是方法的闭包，紧挨在它下面就是那个类。等方法们
+编译完，我们就不再需要这个类了，于是让虚拟机把它从栈上弹掉。</p>
+<div class="codehilite"><pre class="insert-before">  consume(TOKEN_RIGHT_BRACE, &quot;Expect '}' after class body.&quot;);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>classDeclaration</em>() 内</div>
+<pre class="insert">  <span class="i">emitByte</span>(<span class="a">OP_POP</span>);
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>classDeclaration</em>() 内</div>
+
+<p>把所有这些拼起来，这里有一个可以丢给编译器的类声明例子：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brunch</span> {
+  <span class="i">bacon</span>() {}
+  <span class="i">eggs</span>() {}
+}
+</pre></div>
+<p>给定这样的输入，编译器生成的内容如下，图中还标出了这些指令如何影响栈：</p><img src="image/methods-and-initializers/method-instructions.png" alt="一个带两个方法的类声明所生成的那串字节码指令。" />
+<p>剩下的就是为那条新的 <code>OP_METHOD</code> 指令实现运行时部分。</p>
+<h3><a href="#执行方法声明" id="执行方法声明"><small>28&#8202;.&#8202;1&#8202;.&#8202;3</small>执行方法声明</a></h3>
+<p>首先定义操作码。</p>
+<div class="codehilite"><pre class="insert-before">  OP_CLASS,
+</pre><div class="source-file"><em>chunk.h</em><br>
+在枚举 <em>OpCode</em> 内</div>
+<pre class="insert">  <span class="a">OP_METHOD</span>
+</pre><pre class="insert-after">} OpCode;
+</pre></div>
+<div class="source-file-narrow"><em>chunk.h</em>, 在枚举 <em>OpCode</em> 内</div>
+
+<p>像其他带字符串常量操作数的指令一样，我们给它写反汇编。</p>
+<div class="codehilite"><pre class="insert-before">    case OP_CLASS:
+      return constantInstruction(&quot;OP_CLASS&quot;, chunk, offset);
+</pre><div class="source-file"><em>debug.c</em><br>
+在 <em>disassembleInstruction</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OP_METHOD</span>:
+      <span class="k">return</span> <span class="i">constantInstruction</span>(<span class="s">&quot;OP_METHOD&quot;</span>, <span class="i">chunk</span>, <span class="i">offset</span>);
+</pre><pre class="insert-after">    default:
+</pre></div>
+<div class="source-file-narrow"><em>debug.c</em>, 在 <em>disassembleInstruction</em>() 内</div>
+
+<p>解释器那边，我们同样加一个新分支。</p>
+<div class="codehilite"><pre class="insert-before">        break;
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OP_METHOD</span>:
+        <span class="i">defineMethod</span>(<span class="a">READ_STRING</span>());
+        <span class="k">break</span>;
+</pre><pre class="insert-after">    }
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>在那里，我们从常量表读出方法名，传给这个函数：</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>closeUpvalues</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">defineMethod</span>(<span class="t">ObjString</span>* <span class="i">name</span>) {
+  <span class="t">Value</span> <span class="i">method</span> = <span class="i">peek</span>(<span class="n">0</span>);
+  <span class="t">ObjClass</span>* <span class="i">klass</span> = <span class="a">AS_CLASS</span>(<span class="i">peek</span>(<span class="n">1</span>));
+  <span class="i">tableSet</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>, <span class="i">name</span>, <span class="i">method</span>);
+  <span class="i">pop</span>();
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>closeUpvalues</em>() 之后</div>
+
+<p>方法的闭包在栈顶，正好压在它将要绑定的那个类上面。我们读取那两个栈槽位，把闭包存进类的
+方法表。然后把闭包弹出去——用完了。</p>
+<p>注意，我们对闭包和类对象都没做任何运行时类型检查。那句 <code>AS_CLASS()</code> 是安全的，因为正是编译器
+自己生成了让这个类待在那个栈槽位里的代码。虚拟机<span name="verify">信任</span>自己的编译器。</p>
+<aside name="verify">
+<p>虚拟机相信它执行的指令是有效的，是因为<strong>唯一</strong>能让代码进入字节码解释器的途径，就是走一遍
+clox 自己的编译器。很多字节码虚拟机，比如 JVM 和 CPython，都支持执行另外单独编译出来的
+字节码。那就是另一套安全故事了。恶意构造出来的字节码能让虚拟机崩溃，甚至更糟。</p>
+<p>为防止这一点，JVM 在执行任何加载进来的代码之前，会先跑一遍字节码验证。CPython 则说，要
+用户自己保证跑起来的字节码是安全的。</p>
+</aside>
+<p>等这串 <code>OP_METHOD</code> 指令跑完、<code>OP_POP</code> 把类弹掉，我们就得到一个方法表塞得满满当当的类，
+可以开始干活了。下一步是把那些方法再取出来用。</p>
+<h2><a href="#方法引用" id="方法引用"><small>28&#8202;.&#8202;2</small>方法引用</a></h2>
+<p>大多数时候，方法一取出来就立刻调用，于是有了这个眼熟的语法：</p>
+<div class="codehilite"><pre><span class="i">instance</span>.<span class="i">method</span>(<span class="i">argument</span>);
+</pre></div>
+<p>但别忘了，在 Lox 和另外一些语言里，这两步是分开的，可以拆开。</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">closure</span> = <span class="i">instance</span>.<span class="i">method</span>;
+<span class="i">closure</span>(<span class="i">argument</span>);
+</pre></div>
+<p>既然用户<strong>确实可以</strong>把这两个操作拆开，我们就必须分开实现。第一步是用已有的点号属性语法，
+去访问定义在实例所属类上的方法。它应该返回某种对象，用户随后就能像调用函数一样调用它。</p>
+<p>最直接的做法是在类的方法表里查这个名字，返回与之关联的那个 ObjClosure。但我们还得记住：
+你访问一个方法时，<code>this</code> 会绑定到访问它时所在的那个实例。这是<a href="classes.html#类上的方法">我们在 jlox 里加方法那会儿</a>给的例子：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Person</span> {
+  <span class="i">sayName</span>() {
+    <span class="k">print</span> <span class="k">this</span>.<span class="i">name</span>;
+  }
+}
+
+<span class="k">var</span> <span class="i">jane</span> = <span class="t">Person</span>();
+<span class="i">jane</span>.<span class="i">name</span> = <span class="s">&quot;Jane&quot;</span>;
+
+<span class="k">var</span> <span class="i">method</span> = <span class="i">jane</span>.<span class="i">sayName</span>;
+<span class="i">method</span>(); <span class="c">// ?</span>
+</pre></div>
+<p>这应该打印 &ldquo;Jane&rdquo;，所以 <code>.sayName</code> 返回的那个对象，得在日后被调用时，设法记住它是从哪个
+实例上取下来的。在 jlox 里，我们用解释器原有的、堆上分配的 Environment 类来实现这份
+「记忆」，那个类负责所有变量的存储。</p>
+<p>我们的字节码虚拟机有一套更复杂的状态存储架构。<a href="local-variables.html#表示局部变量">局部变量和临时值</a>在栈上，
+<a href="global-variables.html#变量声明">全局变量</a>在一张哈希表里，而闭包捕获的变量则用<a href="closures.html#upvalue">upvalue</a>。这就要求 clox 里
+得用一套稍微复杂些的方案来跟踪方法的接收者，还需要一个新的运行时类型。</p>
+<h3><a href="#绑定方法" id="绑定方法"><small>28&#8202;.&#8202;2&#8202;.&#8202;1</small>绑定方法</a></h3>
+<p>当用户执行一次方法访问时，我们找出那个方法的闭包，把它包进一个新的
+<span name="bound">「绑定方法」</span>对象，这个对象记着方法是从哪个实例上取下来的。这个绑定对象之后可以像函数
+一样被调用。被调用时，虚拟机会做些手脚，把 <code>this</code> 接到方法体里的接收者上。</p>
+<aside name="bound">
+<p>&ldquo;bound method&rdquo; 这个名字是从 CPython 那里拿的。Python 在这里的行为跟 Lox 相近，我拿它的
+实现当参考。</p>
+</aside>
+<p>新对象类型长这样：</p>
+<div class="codehilite"><pre class="insert-before">} ObjInstance;
+
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjInstance</em> 之后</div>
+<pre class="insert"><span class="k">typedef</span> <span class="k">struct</span> {
+  <span class="t">Obj</span> <span class="i">obj</span>;
+  <span class="t">Value</span> <span class="i">receiver</span>;
+  <span class="t">ObjClosure</span>* <span class="i">method</span>;
+} <span class="t">ObjBoundMethod</span>;
+
+</pre><pre class="insert-after">ObjClass* newClass(ObjString* name);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjInstance</em> 之后</div>
+
+<p>它把接收者和方法闭包包在一起。接收者的类型是 Value，尽管方法只能在 ObjInstance 上调用。反正
+虚拟机也不在乎接收者是什么类型，用 Value 就意味着当它被传给更通用的函数时，我们不必反复把
+指针转回 Value。</p>
+<p>新结构体意味着那套你现在已经很熟悉的样板代码。先在对象类型枚举里加一个新分支：</p>
+<div class="codehilite"><pre class="insert-before">typedef enum {
+</pre><div class="source-file"><em>object.h</em><br>
+在枚举 <em>ObjType</em> 内</div>
+<pre class="insert">  <span class="a">OBJ_BOUND_METHOD</span>,
+</pre><pre class="insert-after">  OBJ_CLASS,
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在枚举 <em>ObjType</em> 内</div>
+
+<p>一个测试值类型的宏：</p>
+<div class="codehilite"><pre class="insert-before">#define OBJ_TYPE(value)        (AS_OBJ(value)-&gt;type)
+
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)</span>
+</pre><pre class="insert-after">#define IS_CLASS(value)        isObjType(value, OBJ_CLASS)
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>另一个把值转成 ObjBoundMethod 指针的宏：</p>
+<div class="codehilite"><pre class="insert-before">#define IS_STRING(value)       isObjType(value, OBJ_STRING)
+
+</pre><div class="source-file"><em>object.h</em></div>
+<pre class="insert"><span class="a">#define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))</span>
+</pre><pre class="insert-after">#define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em></div>
+
+<p>一个创建新 ObjBoundMethod 的函数：</p>
+<div class="codehilite"><pre class="insert-before">} ObjBoundMethod;
+
+</pre><div class="source-file"><em>object.h</em><br>
+加在结构体 <em>ObjBoundMethod</em> 之后</div>
+<pre class="insert"><span class="t">ObjBoundMethod</span>* <span class="i">newBoundMethod</span>(<span class="t">Value</span> <span class="i">receiver</span>,
+                               <span class="t">ObjClosure</span>* <span class="i">method</span>);
+</pre><pre class="insert-after">ObjClass* newClass(ObjString* name);
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 加在结构体 <em>ObjBoundMethod</em> 之后</div>
+
+<p>这个函数的实现在这里：</p>
+<div class="codehilite"><div class="source-file"><em>object.c</em><br>
+加在 <em>allocateObject</em>() 之后</div>
+<pre><span class="t">ObjBoundMethod</span>* <span class="i">newBoundMethod</span>(<span class="t">Value</span> <span class="i">receiver</span>,
+                               <span class="t">ObjClosure</span>* <span class="i">method</span>) {
+  <span class="t">ObjBoundMethod</span>* <span class="i">bound</span> = <span class="a">ALLOCATE_OBJ</span>(<span class="t">ObjBoundMethod</span>,
+                                       <span class="a">OBJ_BOUND_METHOD</span>);
+  <span class="i">bound</span>-&gt;<span class="i">receiver</span> = <span class="i">receiver</span>;
+  <span class="i">bound</span>-&gt;<span class="i">method</span> = <span class="i">method</span>;
+  <span class="k">return</span> <span class="i">bound</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 加在 <em>allocateObject</em>() 之后</div>
+
+<p>这个构造函数一般的函数只是把传进来的闭包和接收者存下来。等绑定方法不再需要时，我们释放它。</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_BOUND_METHOD</span>:
+      <span class="a">FREE</span>(<span class="t">ObjBoundMethod</span>, <span class="i">object</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_CLASS: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<p>绑定方法握着几个引用，但它们并不<strong>归</strong>它所有，所以除了自己，它什么都不释放。不过那些引用
+确实会被垃圾回收器追踪。</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_BOUND_METHOD</span>: {
+      <span class="t">ObjBoundMethod</span>* <span class="i">bound</span> = (<span class="t">ObjBoundMethod</span>*)<span class="i">object</span>;
+      <span class="i">markValue</span>(<span class="i">bound</span>-&gt;<span class="i">receiver</span>);
+      <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">bound</span>-&gt;<span class="i">method</span>);
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_CLASS: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>这<span name="trace">确保</span>了一个指向方法的句柄会把接收者留在内存里，这样等你之后
+调用这个句柄时，<code>this</code> 还能找到那个对象。我们也追踪方法闭包。</p>
+<aside name="trace">
+<p>追踪方法闭包其实没必要。接收者是个 ObjInstance，它有一个指向 ObjClass 的指针，而 ObjClass
+有一张装着所有方法的表。但让 ObjBoundMethod 依赖这条链路，总让我有点不踏实。</p>
+</aside>
+<p>所有对象都支持的最后一个操作是打印。</p>
+<div class="codehilite"><pre class="insert-before">  switch (OBJ_TYPE(value)) {
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>printObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_BOUND_METHOD</span>:
+      <span class="i">printFunction</span>(<span class="a">AS_BOUND_METHOD</span>(<span class="i">value</span>)-&gt;<span class="i">method</span>-&gt;<span class="i">function</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_CLASS:
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>printObject</em>() 内</div>
+
+<p>绑定方法的打印方式和函数一模一样。从用户的视角看，绑定方法<strong>就是</strong>函数，是他们能调用的对象。
+我们不会把「虚拟机用另一种对象类型来实现绑定方法」这件事暴露出去。</p>
+<aside name="party"><img src="image/methods-and-initializers/party-hat.png" alt="一顶派对帽。" />
+</aside>
+<p>戴上你的<span name="party">派对</span>帽子吧，因为我们刚到达一个小里程碑。ObjBoundMethod 是
+要加进 clox 的最后一个运行时类型。你的最后一个 <code>IS_</code> 和 <code>AS_</code> 宏也写完了。离全书结束只剩
+几章，我们也越来越接近一个完整的虚拟机。</p>
+<h3><a href="#访问方法" id="访问方法"><small>28&#8202;.&#8202;2&#8202;.&#8202;2</small>访问方法</a></h3>
+<p>让这个新对象类型干点活吧。方法是用上一章实现的同一套「点号」属性语法访问的。编译器已经会
+解析相应的表达式，并为它们发射 <code>OP_GET_PROPERTY</code> 指令。我们要改的只有运行时部分。</p>
+<p>属性访问指令执行时，实例在栈顶。这条指令的活儿是找到给定名字的字段或方法，然后用访问到的
+属性替换栈顶。</p>
+<p>解释器已经处理了字段，所以只要给 <code>OP_GET_PROPERTY</code> 那个分支再加一小段就行。</p>
+<div class="codehilite"><pre class="insert-before">          pop(); // 实例。
+          push(value);
+          break;
+        }
+
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">        <span class="k">if</span> (!<span class="i">bindMethod</span>(<span class="i">instance</span>-&gt;<span class="i">klass</span>, <span class="i">name</span>)) {
+          <span class="k">return</span> <span class="a">INTERPRET_RUNTIME_ERROR</span>;
+        }
+        <span class="k">break</span>;
+</pre><pre class="insert-after">      }
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内, 替换 2 行</div>
+
+<p>我们把它插在「在接收者实例上查字段」那段代码之后。字段优先于方法，并且会遮蔽方法，所以我们
+先找字段。如果实例没有给定属性名的字段，那么这个名字可能指的是一个方法。</p>
+<p>我们取出实例的类，交给一个新的 <code>bindMethod()</code> 辅助函数。如果那个函数找到了方法，它就把方法
+放到栈上并返回 <code>true</code>。否则返回 <code>false</code>，表示没找到这个名字的方法。既然这个名字也不是字段，
+那就意味着遇到了运行时错误，我们中止解释器。</p>
+<p>正戏来了：</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>callValue</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">bool</span> <span class="i">bindMethod</span>(<span class="t">ObjClass</span>* <span class="i">klass</span>, <span class="t">ObjString</span>* <span class="i">name</span>) {
+  <span class="t">Value</span> <span class="i">method</span>;
+  <span class="k">if</span> (!<span class="i">tableGet</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>, <span class="i">name</span>, &amp;<span class="i">method</span>)) {
+    <span class="i">runtimeError</span>(<span class="s">&quot;Undefined property &#39;%s&#39;.&quot;</span>, <span class="i">name</span>-&gt;<span class="i">chars</span>);
+    <span class="k">return</span> <span class="k">false</span>;
+  }
+
+  <span class="t">ObjBoundMethod</span>* <span class="i">bound</span> = <span class="i">newBoundMethod</span>(<span class="i">peek</span>(<span class="n">0</span>),
+                                         <span class="a">AS_CLOSURE</span>(<span class="i">method</span>));
+  <span class="i">pop</span>();
+  <span class="i">push</span>(<span class="a">OBJ_VAL</span>(<span class="i">bound</span>));
+  <span class="k">return</span> <span class="k">true</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>callValue</em>() 之后</div>
+
+<p>首先我们在类的方法表里查找给定名字的方法。如果没找到，就报告一个运行时错误并退出。否则，
+我们取出这个方法，把它包进一个新的 ObjBoundMethod。接收者就在栈顶上它自己的位置上。最后
+我们弹出实例，用绑定方法替换栈顶。</p>
+<p>举个例子：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brunch</span> {
+  <span class="i">eggs</span>() {}
+}
+
+<span class="k">var</span> <span class="i">brunch</span> = <span class="t">Brunch</span>();
+<span class="k">var</span> <span class="i">eggs</span> = <span class="i">brunch</span>.<span class="i">eggs</span>;
+</pre></div>
+<p>虚拟机为 <code>brunch.eggs</code> 这个表达式执行 <code>bindMethod()</code> 调用时，发生的正是这些事：</p><img src="image/methods-and-initializers/bind-method.png" alt="bindMethod() 引起的栈变化。" />
+<p>底下一堆机关，但从用户的角度看，他们只是拿到了一个能调用的函数。</p>
+<h3><a href="#调用方法" id="调用方法"><small>28&#8202;.&#8202;2&#8202;.&#8202;3</small>调用方法</a></h3>
+<p>用户可以在类上声明方法、在实例上访问方法、把绑定方法放到栈上。他们就是没法拿这些绑定方法
+对象干<span name="do"><strong>点什么</strong></span>有用的事。我们缺的那个操作就是调用它们。调用是在
+<code>callValue()</code> 里实现的，所以我们在那儿为这个新对象类型加一个分支。</p>
+<aside name="do">
+<p>绑定方法<strong>是</strong>一等值，所以他们可以把它存进变量、传给函数，做各种「值」的事情。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">    switch (OBJ_TYPE(callee)) {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>callValue</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OBJ_BOUND_METHOD</span>: {
+        <span class="t">ObjBoundMethod</span>* <span class="i">bound</span> = <span class="a">AS_BOUND_METHOD</span>(<span class="i">callee</span>);
+        <span class="k">return</span> <span class="i">call</span>(<span class="i">bound</span>-&gt;<span class="i">method</span>, <span class="i">argCount</span>);
+      }
+</pre><pre class="insert-after">      case OBJ_CLASS: {
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>callValue</em>() 内</div>
+
+<p>我们从 ObjBoundMethod 里把那个原始闭包重新取出来，用已有的 <code>call()</code> 辅助函数启动对它的
+调用——做法是给它在调用栈上压入一个调用帧。就这些，已经足够跑这个 Lox 程序了：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Scone</span> {
+  <span class="i">topping</span>(<span class="i">first</span>, <span class="i">second</span>) {
+    <span class="k">print</span> <span class="s">&quot;scone with &quot;</span> + <span class="i">first</span> + <span class="s">&quot; and &quot;</span> + <span class="i">second</span>;
+  }
+}
+
+<span class="k">var</span> <span class="i">scone</span> = <span class="t">Scone</span>();
+<span class="i">scone</span>.<span class="i">topping</span>(<span class="s">&quot;berries&quot;</span>, <span class="s">&quot;cream&quot;</span>);
+</pre></div>
+<p>三步搞定。我们能声明方法、访问方法、调用方法了。但还缺点什么。我们费了那么大力气把方法闭包
+包进一个绑定接收者的对象里，可调用方法的时候，我们压根没用那个接收者。</p>
+<h2><a href="#this" id="this"><small>28&#8202;.&#8202;3</small>This</a></h2>
+<p>绑定方法之所以要攥着接收者不放，是为了让方法体内部能访问到它。Lox 通过 <code>this</code> 表达式把方法
+的接收者暴露出来。该上点新语法了。词法分析器已经把 <code>this</code> 当作一种特殊的词法单元类型，所以
+第一步是把这个词法单元接进解析表。</p>
+<div class="codehilite"><pre class="insert-before">  [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
+</pre><div class="source-file"><em>compiler.c</em><br>
+替换 1 行</div>
+<pre class="insert">  [<span class="a">TOKEN_THIS</span>]          = {<span class="i">this_</span>,    <span class="a">NULL</span>,   <span class="a">PREC_NONE</span>},
+</pre><pre class="insert-after">  [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 替换 1 行</div>
+
+<aside name="this">
+<p>解析器函数名字末尾那个下划线，是因为 <code>this</code> 在 C++ 里是保留字，而我们支持把 clox 编译成 C++。</p>
+</aside>
+<p>解析器在前缀位置遇到 <code>this</code> 时，会分派到一个新的解析函数。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>variable</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">this_</span>(<span class="t">bool</span> <span class="i">canAssign</span>) {
+  <span class="i">variable</span>(<span class="k">false</span>);
+}<span name="this"> </span>
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>variable</em>() 之后</div>
+
+<p>在 clox 里实现 <code>this</code>，我们沿用 jlox 中用过的同一套手法。我们把 <code>this</code> 当作一个词法作用域的
+局部变量，它的值则被魔法般地初始化好。像编译局部变量那样编译它，意味着我们白捡了很多行为。
+尤其是，方法内部引用 <code>this</code> 的闭包会做出正确的行为，把接收者捕获进一个 upvalue。</p>
+<p>解析器函数被调用时，<code>this</code> 词法单元刚被消费掉，存成了前一个词法单元。我们调用已有的
+<code>variable()</code> 函数，它负责把标识符表达式编译成变量访问。它有一个布尔参数，表示编译器是否该
+去找后面跟着的 <code>=</code> 运算符并解析出一个 setter。不能给 <code>this</code> 赋值，所以我们传 <code>false</code> 来禁止
+这件事。</p>
+<p><code>variable()</code> 函数并不在乎 <code>this</code> 有自己的词法单元类型、不是标识符。它乐意把词素 &ldquo;this&rdquo; 当作
+一个变量名来处理，再用现有的作用域解析机制去查找它。此刻那次查找会失败，因为我们从来没
+声明过一个名字叫 &ldquo;this&rdquo; 的变量。是时候想想接收者该待在内存的哪儿了。</p>
+<p>至少在被闭包捕获之前，clox 把每个局部变量都存在虚拟机的栈上。编译器记着函数的那个栈窗口里，
+哪些槽位归哪些局部变量所有。你应该还记得，编译器是靠声明一个名字为空字符串的局部变量，
+来预留栈槽位零的。</p>
+<p>对函数调用来说，那个槽位最终装的是被调用的函数。由于它没有名字，函数体永远不会访问它。你能
+猜到这要通向哪里。对<strong>方法</strong>调用，我们可以把这个槽位挪用来存接收者。槽位零会存 <code>this</code> 所
+绑定的那个实例。为了编译 <code>this</code> 表达式，编译器只需要给那个局部变量起对名字就行。</p>
+<div class="codehilite"><pre class="insert-before">  local-&gt;isCaptured = false;
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>initCompiler</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">type</span> != <span class="a">TYPE_FUNCTION</span>) {
+    <span class="i">local</span>-&gt;<span class="i">name</span>.<span class="i">start</span> = <span class="s">&quot;this&quot;</span>;
+    <span class="i">local</span>-&gt;<span class="i">name</span>.<span class="i">length</span> = <span class="n">4</span>;
+  } <span class="k">else</span> {
+    <span class="i">local</span>-&gt;<span class="i">name</span>.<span class="i">start</span> = <span class="s">&quot;&quot;</span>;
+    <span class="i">local</span>-&gt;<span class="i">name</span>.<span class="i">length</span> = <span class="n">0</span>;
+  }
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>initCompiler</em>() 内, 替换 2 行</div>
+
+<p>我们只想对方法这么做。函数声明里没有 <code>this</code>。而且事实上，它们<strong>绝不能</strong>声明一个叫 &ldquo;this&rdquo; 的
+变量，这样当你写一个 <code>this</code> 表达式——它位于某个函数声明内部，而这个函数声明又位于某个方法
+内部——那个 <code>this</code> 才会正确地解析到外层方法的接收者。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Nested</span> {
+  <span class="i">method</span>() {
+    <span class="k">fun</span> <span class="i">function</span>() {
+      <span class="k">print</span> <span class="k">this</span>;
+    }
+
+    <span class="i">function</span>();
+  }
+}
+
+<span class="t">Nested</span>().<span class="i">method</span>();
+</pre></div>
+<p>这个程序应该打印 &ldquo;Nested instance&rdquo;。为了决定给局部槽位零起什么名字，编译器需要知道自己编译的
+是函数声明还是方法声明，于是我们在 FunctionType 枚举里加一个新分支来区分方法。</p>
+<div class="codehilite"><pre class="insert-before">  TYPE_FUNCTION,
+</pre><div class="source-file"><em>compiler.c</em><br>
+在枚举 <em>FunctionType</em> 内</div>
+<pre class="insert">  <span class="a">TYPE_METHOD</span>,
+</pre><pre class="insert-after">  TYPE_SCRIPT
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在枚举 <em>FunctionType</em> 内</div>
+
+<p>编译方法时，我们用的就是这个类型。</p>
+<div class="codehilite"><pre class="insert-before">  uint8_t constant = identifierConstant(&amp;parser.previous);
+
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>method</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">  <span class="t">FunctionType</span> <span class="i">type</span> = <span class="a">TYPE_METHOD</span>;
+</pre><pre class="insert-after">  function(type);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>method</em>() 内, 替换 1 行</div>
+
+<p>现在我们能正确编译对那个特殊的 &ldquo;this&rdquo; 变量的引用了，编译器会发射正确的 <code>OP_GET_LOCAL</code> 指令
+来访问它。闭包甚至能捕获 <code>this</code>，把接收者存进 upvalue 里。挺酷的。</p>
+<p>只不过在运行时，接收者其实<strong>并不在</strong>槽位零里。解释器还没履行它那一半的约定。修法在这儿：</p>
+<div class="codehilite"><pre class="insert-before">      case OBJ_BOUND_METHOD: {
+        ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>callValue</em>() 内</div>
+<pre class="insert">        <span class="i">vm</span>.<span class="i">stackTop</span>[-<span class="i">argCount</span> - <span class="n">1</span>] = <span class="i">bound</span>-&gt;<span class="i">receiver</span>;
+</pre><pre class="insert-after">        return call(bound-&gt;method, argCount);
+      }
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>callValue</em>() 内</div>
+
+<p>方法被调用时，栈顶是全部实参，而在这些实参正下方就是被调用方法的闭包。新建的调用帧里，槽位
+零就是那个位置。这行代码把接收者插进那个槽位。举个例子，给定这样一个方法调用：</p>
+<div class="codehilite"><pre><span class="i">scone</span>.<span class="i">topping</span>(<span class="s">&quot;berries&quot;</span>, <span class="s">&quot;cream&quot;</span>);
+</pre></div>
+<p>存接收者的那个槽位，我们这样算：</p><img src="image/methods-and-initializers/closure-slot.png" alt="跳过实参占用的栈槽位，找到装着闭包的那个槽位。" />
+<p><code>-argCount</code> 跳过那些实参，<code>- 1</code> 则是为了修正一个事实：<code>stackTop</code> 指向的是最后一个用过的
+栈槽位的<strong>再往后</strong>一位。</p>
+<h3><a href="#错误使用-this" id="错误使用-this"><small>28&#8202;.&#8202;3&#8202;.&#8202;1</small>错误使用 this</a></h3>
+<p>我们的虚拟机现在支持用户<strong>正确</strong>使用 <code>this</code> 了，但还得确保它能妥善处理用户<strong>错误</strong>使用
+<code>this</code> 的情况。Lox 规定：<code>this</code> 表达式出现在方法体之外就是编译错误。下面这两种错误用法都该
+由编译器抓住：</p>
+<div class="codehilite"><pre><span class="k">print</span> <span class="k">this</span>; <span class="c">// 在顶层。</span>
+
+<span class="k">fun</span> <span class="i">notMethod</span>() {
+  <span class="k">print</span> <span class="k">this</span>; <span class="c">// 在函数里。</span>
+}
+</pre></div>
+<p>那么编译器怎么知道自己在一个方法里面？显而易见的答案是看当前 Compiler 的 FunctionType。我们
+刚刚确实在那里加了一个枚举分支来特殊对待方法。但这没法正确处理前面那个例子：你在一个函数
+里面，而这个函数自己又嵌套在某个方法里面。</p>
+<p>我们可以试着解析 &ldquo;this&rdquo;，如果周边所有词法作用域里都找不到，就报个错。这行得通，但需要我们
+把一堆代码挪来挪去，因为眼下解析一个变量的代码在找不到任何声明时，会隐含地把它当成一次
+全局访问。</p>
+<p>下一章我们会需要关于最近的外层类的信息。要是手上有这个信息，这里就能用它来判断我们是否在
+方法里面。所以不妨顺手让未来的自己轻松一点，现在就把那套机制搭好。</p>
+<div class="codehilite"><pre class="insert-before">Compiler* current = NULL;
+</pre><div class="source-file"><em>compiler.c</em><br>
+加在变量 <em>current</em> 之后</div>
+<pre class="insert"><span class="t">ClassCompiler</span>* <span class="i">currentClass</span> = <span class="a">NULL</span>;
+</pre><pre class="insert-after">
+
+static Chunk* currentChunk() {
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在变量 <em>current</em> 之后</div>
+
+<p>这个模块级变量指向一个结构体，代表当前正在编译的、最内层的那个类。新类型长这样：</p>
+<div class="codehilite"><pre class="insert-before">} Compiler;
+</pre><div class="source-file"><em>compiler.c</em><br>
+加在结构体 <em>Compiler</em> 之后</div>
+<pre class="insert">
+
+<span class="k">typedef</span> <span class="k">struct</span> <span class="t">ClassCompiler</span> {
+  <span class="k">struct</span> <span class="t">ClassCompiler</span>* <span class="i">enclosing</span>;
+} <span class="t">ClassCompiler</span>;
+</pre><pre class="insert-after">
+
+Parser parser;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在结构体 <em>Compiler</em> 之后</div>
+
+<p>目前我们只存一个指针，指向外层类的 ClassCompiler（如果有的话）。把一个类声明嵌套在另一个
+类的某个方法里，这种事不常见，但 Lox 支持它。就跟 Compiler 结构体一样，这意味着 ClassCompiler
+从当前正在编译的最内层类一路串出去、穿过所有外层类，形成一条链表。</p>
+<p>如果我们根本不在任何类声明里面，模块变量 <code>currentClass</code> 就是 <code>NULL</code>。当编译器开始编译一个类时，
+它把一个新的 ClassCompiler 压到那条隐式链表栈上。</p>
+<div class="codehilite"><pre class="insert-before">  defineVariable(nameConstant);
+
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>classDeclaration</em>() 内</div>
+<pre class="insert">  <span class="t">ClassCompiler</span> <span class="i">classCompiler</span>;
+  <span class="i">classCompiler</span>.<span class="i">enclosing</span> = <span class="i">currentClass</span>;
+  <span class="i">currentClass</span> = &amp;<span class="i">classCompiler</span>;
+
+</pre><pre class="insert-after">  namedVariable(className, false);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>classDeclaration</em>() 内</div>
+
+<p>ClassCompiler 结构体的内存就在 C 栈上——这是我们用递归下降写编译器白捡的一个方便能力。类体
+结束时，我们把那个编译器从栈上弹下来，恢复外层那个。</p>
+<div class="codehilite"><pre class="insert-before">  emitByte(OP_POP);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>classDeclaration</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">currentClass</span> = <span class="i">currentClass</span>-&gt;<span class="i">enclosing</span>;
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>classDeclaration</em>() 内</div>
+
+<p>最外层类体结束时，<code>enclosing</code> 会是 <code>NULL</code>，所以这行把 <code>currentClass</code> 重置为 <code>NULL</code>。于是，要
+判断我们是否在一个类里面——也就是是否在一个方法里面——只要看一眼那个模块变量就行。</p>
+<div class="codehilite"><pre class="insert-before">static void this_(bool canAssign) {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>this_</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">currentClass</span> == <span class="a">NULL</span>) {
+    <span class="i">error</span>(<span class="s">&quot;Can&#39;t use &#39;this&#39; outside of a class.&quot;</span>);
+    <span class="k">return</span>;
+  }
+
+</pre><pre class="insert-after">  variable(false);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>this_</em>() 内</div>
+
+<p>有了这个，类外使用 <code>this</code> 就被正确地禁止了。现在我们的方法在面向对象的意义上真的<strong>像方法</strong>了。
+拿到接收者，它们就能影响你调用方法时所在的那个实例。快到了！</p>
+<h2><a href="#实例初始化器" id="实例初始化器"><small>28&#8202;.&#8202;4</small>实例初始化器</a></h2>
+<p>面向对象语言之所以把状态和行为捆在一起——这是该范式的核心信条之一——是为了确保对象
+始终处于一个有效、有意义的状态。当触碰一个对象状态的唯一途径是<span name="through">通过</span>
+它的方法时，那些方法就能保证不出乱子。但这前提是对象<strong>已经</strong>处于合适的状态。那它刚被创建的
+时候呢？</p>
+<aside name="through">
+<p>当然，Lox 确实允许外部代码不经过方法就直接访问和修改实例的字段。这跟 Ruby 和 Smalltalk 不同，
+后两者把状态完全封装在对象内部。可惜我们这门玩具脚本语言没这么讲究。</p>
+</aside>
+<p>面向对象语言靠构造函数来保证崭新的对象被正确设置妥当——构造函数既产出一个新实例，也初始化
+它的状态。在 Lox 里，运行时分配的是原始实例，而一个类可以声明一个初始化器来设置各个字段。
+初始化器大体上和普通方法一样，只是有几处改动：</p>
+<ol>
+<li>
+<p>每当一个类的实例被创建时，运行时会自动调用初始化器方法。</p>
+</li>
+<li>
+<p>构造实例的调用方总能在初始化器跑完之后把实例<span name="return">拿回来</span>，不管
+初始化器函数本身返回了什么。初始化器方法不需要显式地 <code>return this</code>。</p>
+</li>
+<li>
+<p>事实上，初始化器<strong>被禁止</strong>返回任何值，因为那个值反正永远也不会被看到。</p>
+</li>
+</ol>
+<aside name="return">
+<p>这就像初始化器被隐式地裹进了这么一段代码：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">create</span>(<span class="i">klass</span>) {
+  <span class="k">var</span> <span class="i">obj</span> = <span class="i">newInstance</span>(<span class="i">klass</span>);
+  <span class="i">obj</span>.<span class="i">init</span>();
+  <span class="k">return</span> <span class="i">obj</span>;
+}
+</pre></div>
+<p>留意 <code>init()</code> 的返回值被丢掉了。</p>
+</aside>
+<p>既然我们已经支持了方法，要加上初始化器，只需实现那三条特殊规则。我们一条一条来。</p>
+<h3><a href="#调用初始化器" id="调用初始化器"><small>28&#8202;.&#8202;4&#8202;.&#8202;1</small>调用初始化器</a></h3>
+<p>第一，在新实例上自动调用 <code>init()</code>：</p>
+<div class="codehilite"><pre class="insert-before">        vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>callValue</em>() 内</div>
+<pre class="insert">        <span class="t">Value</span> <span class="i">initializer</span>;
+        <span class="k">if</span> (<span class="i">tableGet</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>, <span class="i">vm</span>.<span class="i">initString</span>,
+                     &amp;<span class="i">initializer</span>)) {
+          <span class="k">return</span> <span class="i">call</span>(<span class="a">AS_CLOSURE</span>(<span class="i">initializer</span>), <span class="i">argCount</span>);
+        }
+</pre><pre class="insert-after">        return true;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>callValue</em>() 内</div>
+
+<p>运行时分配出新实例之后，我们在类上找一个 <code>init()</code> 方法。如果找到了，就发起对它的调用。这会
+为初始化器的闭包压入一个新的调用帧。假设我们跑这个程序：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brunch</span> {
+  <span class="i">init</span>(<span class="i">food</span>, <span class="i">drink</span>) {}
+}
+
+<span class="t">Brunch</span>(<span class="s">&quot;eggs&quot;</span>, <span class="s">&quot;coffee&quot;</span>);
+</pre></div>
+<p>虚拟机执行 <code>Brunch()</code> 这个调用时，是这样的：</p><img src="image/methods-and-initializers/init-call-frame.png" alt="Brunch() 调用与它转发到的 init() 方法各自对齐的栈窗口。" />
+<p>我们调用这个类时传进去的任何实参，仍然待在栈上、位于实例之上。<code>init()</code> 方法的新调用帧共享
+同一个栈窗口，所以那些实参就隐式地转发给了初始化器。</p>
+<p>Lox 不要求类必须定义初始化器。如果没定义，运行时直接返回那个刚创建的、未经初始化的实例。
+不过，如果没有 <code>init()</code> 方法，那么在创建实例时还往类上传实参就毫无意义了。我们把这当成一个
+错误。</p>
+<div class="codehilite"><pre class="insert-before">          return call(AS_CLOSURE(initializer), argCount);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>callValue</em>() 内</div>
+<pre class="insert">        } <span class="k">else</span> <span class="k">if</span> (<span class="i">argCount</span> != <span class="n">0</span>) {
+          <span class="i">runtimeError</span>(<span class="s">&quot;Expected 0 arguments but got %d.&quot;</span>,
+                       <span class="i">argCount</span>);
+          <span class="k">return</span> <span class="k">false</span>;
+</pre><pre class="insert-after">        }
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>callValue</em>() 内</div>
+
+<p>当类<strong>确实</strong>提供了初始化器时，我们还得确保传入的实参个数与初始化器的参数个数相符。幸好
+<code>call()</code> 辅助函数已经替我们做了这件事。</p>
+<p>为了调用初始化器，运行时按名字查找 <code>init()</code> 方法。我们希望这一步快，因为每构造一个实例都要
+做一次。也就是说，最好利用我们已经实现的字符串驻留。要这么做，虚拟机为 &ldquo;init&rdquo; 创建一个
+ObjString 然后反复复用。这个字符串就住在 VM 结构体里。</p>
+<div class="codehilite"><pre class="insert-before">  Table strings;
+</pre><div class="source-file"><em>vm.h</em><br>
+在结构体 <em>VM</em> 内</div>
+<pre class="insert">  <span class="t">ObjString</span>* <span class="i">initString</span>;
+</pre><pre class="insert-after">  ObjUpvalue* openUpvalues;
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em>, 在结构体 <em>VM</em> 内</div>
+
+<p>虚拟机启动时，我们创建并驻留这个字符串。</p>
+<div class="codehilite"><pre class="insert-before">  initTable(&amp;vm.strings);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>initVM</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">vm</span>.<span class="i">initString</span> = <span class="i">copyString</span>(<span class="s">&quot;init&quot;</span>, <span class="n">4</span>);
+</pre><pre class="insert-after">
+
+  defineNative(&quot;clock&quot;, clockNative);
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>initVM</em>() 内</div>
+
+<p>我们希望它一直活着，所以 GC 把它当作一个根。</p>
+<div class="codehilite"><pre class="insert-before">  markCompilerRoots();
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markRoots</em>() 内</div>
+<pre class="insert">  <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">vm</span>.<span class="i">initString</span>);
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markRoots</em>() 内</div>
+
+<p>仔细看。有没有哪个 bug 正在等着发生？没有？这是个微妙的 bug。垃圾回收器现在会读 <code>vm.initString</code>
+字段。而这个字段是由调用 <code>copyString()</code> 的结果初始化的。但复制一个字符串要分配内存，这可能
+触发一次 GC。如果收集器恰好在错误的时间跑起来，它就会读到尚未初始化过的 <code>vm.initString</code>。所以，
+我们要先把字段清零。</p>
+<div class="codehilite"><pre class="insert-before">  initTable(&amp;vm.strings);
+
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>initVM</em>() 内</div>
+<pre class="insert">  <span class="i">vm</span>.<span class="i">initString</span> = <span class="a">NULL</span>;
+</pre><pre class="insert-after">  vm.initString = copyString(&quot;init&quot;, 4);
+
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>initVM</em>() 内</div>
+
+<p>虚拟机关闭时我们把这个指针清空，因为下一行就要释放它了。</p>
+<div class="codehilite"><pre class="insert-before">  freeTable(&amp;vm.strings);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>freeVM</em>() 内</div>
+<pre class="insert">  <span class="i">vm</span>.<span class="i">initString</span> = <span class="a">NULL</span>;
+</pre><pre class="insert-after">  freeObjects();
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>freeVM</em>() 内</div>
+
+<p>好，这下我们能调用初始化器了。</p>
+<h3><a href="#初始化器的返回值" id="初始化器的返回值"><small>28&#8202;.&#8202;4&#8202;.&#8202;2</small>初始化器的返回值</a></h3>
+<p>下一步是确保：构造一个带初始化器的类的实例时，返回的总是那个新实例，而不是 <code>nil</code>，也不是
+初始化器函数体返回的别的东西。目前，如果一个类定义了初始化器，那么实例被构造时，虚拟机会
+把一次对它的调用压进调用帧栈，然后继续一路跑下去。</p>
+<p>用户在类上的那次调用，会在初始化器方法返回时结束，而栈上留下的是初始化器放进去的那个值。
+这意味着，除非用户特意在初始化器末尾写上 <code>return this;</code>，否则什么实例都不会出来。实在没什么
+用。</p>
+<p>要修这个，只要前端在编译一个初始化器方法时，就在函数体末尾发射不同的字节码，让方法返回
+<code>this</code>，而不是大多数函数默认返回的那个隐式 <code>nil</code>。要做到<strong>这</strong>一点，编译器就得真的知道自己
+正在编译一个初始化器。我们靠检查当前正在编译的方法名是不是 &ldquo;init&rdquo; 来判断。</p>
+<div class="codehilite"><pre class="insert-before">  FunctionType type = TYPE_METHOD;
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>method</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">parser</span>.<span class="i">previous</span>.<span class="i">length</span> == <span class="n">4</span> &amp;&amp;
+      <span class="i">memcmp</span>(<span class="i">parser</span>.<span class="i">previous</span>.<span class="i">start</span>, <span class="s">&quot;init&quot;</span>, <span class="n">4</span>) == <span class="n">0</span>) {
+    <span class="i">type</span> = <span class="a">TYPE_INITIALIZER</span>;
+  }
+
+</pre><pre class="insert-after">  function(type);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>method</em>() 内</div>
+
+<p>我们定义一个新的函数类型，把初始化器和其他方法区分开。</p>
+<div class="codehilite"><pre class="insert-before">  TYPE_FUNCTION,
+</pre><div class="source-file"><em>compiler.c</em><br>
+在枚举 <em>FunctionType</em> 内</div>
+<pre class="insert">  <span class="a">TYPE_INITIALIZER</span>,
+</pre><pre class="insert-after">  TYPE_METHOD,
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在枚举 <em>FunctionType</em> 内</div>
+
+<p>每当编译器在函数体末尾发射那个隐式返回时，我们检查类型，决定是否要插入初始化器特有的行为。</p>
+<div class="codehilite"><pre class="insert-before">static void emitReturn() {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>emitReturn</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">current</span>-&gt;<span class="i">type</span> == <span class="a">TYPE_INITIALIZER</span>) {
+    <span class="i">emitBytes</span>(<span class="a">OP_GET_LOCAL</span>, <span class="n">0</span>);
+  } <span class="k">else</span> {
+    <span class="i">emitByte</span>(<span class="a">OP_NIL</span>);
+  }
+
+</pre><pre class="insert-after">  emitByte(OP_RETURN);
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>emitReturn</em>() 内, 替换 1 行</div>
+
+<p>在初始化器里，返回之前不再把 <code>nil</code> 压栈，而是加载槽位零——那里装着那个实例。编译一个不带值的
+<code>return</code> 语句时也会调用这个 <code>emitReturn()</code>，所以用户在初始化器内部提前返回的情形也被正确处理了。</p>
+<h3><a href="#初始化器里的错误返回" id="初始化器里的错误返回"><small>28&#8202;.&#8202;4&#8202;.&#8202;3</small>初始化器里的错误返回</a></h3>
+<p>最后一步，初始化器那串特殊特性清单的最后一项：从初始化器里试图返回<strong>别的</strong>任何东西，都得变成
+一个错误。现在编译器已经跟踪方法类型了，这很简单。</p>
+<div class="codehilite"><pre class="insert-before">  if (match(TOKEN_SEMICOLON)) {
+    emitReturn();
+  } else {
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>returnStatement</em>() 内</div>
+<pre class="insert">    <span class="k">if</span> (<span class="i">current</span>-&gt;<span class="i">type</span> == <span class="a">TYPE_INITIALIZER</span>) {
+      <span class="i">error</span>(<span class="s">&quot;Can&#39;t return a value from an initializer.&quot;</span>);
+    }
+
+</pre><pre class="insert-after">    expression();
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>returnStatement</em>() 内</div>
+
+<p>如果初始化器里一条 <code>return</code> 语句带了值，我们就报一个错误。不过我们之后仍然会把那个值编译出来，
+这样编译器就不会被后面这个表达式搞糊涂，报出一大串连锁错误。</p>
+<p>除了继承——我们<a href="superclasses.html">很快</a>就来讲——clox 里现在已经有了一套功能相当完整的类系统。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">CoffeeMaker</span> {
+  <span class="i">init</span>(<span class="i">coffee</span>) {
+    <span class="k">this</span>.<span class="i">coffee</span> = <span class="i">coffee</span>;
+  }
+
+  <span class="i">brew</span>() {
+    <span class="k">print</span> <span class="s">&quot;Enjoy your cup of &quot;</span> + <span class="k">this</span>.<span class="i">coffee</span>;
+
+    <span class="c">// 咖啡渣别留到第二杯！</span>
+    <span class="k">this</span>.<span class="i">coffee</span> = <span class="k">nil</span>;
+  }
+}
+
+<span class="k">var</span> <span class="i">maker</span> = <span class="t">CoffeeMaker</span>(<span class="s">&quot;coffee and chicory&quot;</span>);
+<span class="i">maker</span>.<span class="i">brew</span>();
+</pre></div>
+<p>对一个能塞进一张旧式<span name="floppy">软盘</span>的 C 程序来说，这已经够花哨了。</p>
+<aside name="floppy">
+<p>我承认，对如今这几代程序员来说，「软盘」也许已经不再是个有用的体积参照。也许我该说
+「几条推文」之类的。</p>
+</aside>
+<h2><a href="#优化的调用" id="优化的调用"><small>28&#8202;.&#8202;5</small>优化的调用</a></h2>
+<p>我们的虚拟机已经正确实现了语言对方法调用和初始化器的语义。到这儿就可以收工了。但我们之所以
+从零开始做整个第二版 Lox 实现，主要是为了跑得比那个旧的 Java 解释器快。眼下即便是
+clox 里的方法调用也很慢。</p>
+<p>Lox 的语义把一次方法调用定义为两个操作——访问方法，然后调用它的结果。虚拟机必须把它们当成
+两个独立操作来支持，因为用户<strong>确实可以</strong>把它们拆开。你可以只访问方法而不调用它，之后再调用
+那个绑定方法。我们到目前为止实现的每一样东西都不多余。</p>
+<p>但<strong>总是</strong>把它们当成两个独立操作执行，代价相当可观。Lox 程序每一次访问并调用一个方法，运行时
+都要在堆上分配一个新的 ObjBoundMethod，初始化它的字段，然后又马上把它们取出来。之后 GC 还得
+花时间释放这一大把朝生暮死的绑定方法。</p>
+<p>大多数时候，Lox 程序访问一个方法，紧接着就调用它。绑定方法由一条字节码指令创建，然后被下一条
+指令消费掉。事实上这件事如此紧挨着，以至于编译器甚至能从文本上<strong>看出来</strong>——一次点号属性访问
+后面紧跟一个左括号，多半就是方法调用。</p>
+<p>既然我们能在编译期认出这对操作，就有机会发射一条<span name="super">全新的、专门的</span>指令，
+用它来做一次优化的方法调用。</p>
+<p>我们从编译点号属性表达式的那个函数开始。</p>
+<aside name="super" class="bottom">
+<p>如果你花足够多的时间盯着自己的字节码虚拟机跑，你会发现它经常一条接一条地执行同一串字节码指令。
+一项经典的优化技术是定义一条新的单一指令，叫做<strong>超级指令</strong>，把这些指令融成一条、行为跟整串
+指令一样的指令。</p>
+<p>字节码解释器里最大的性能消耗之一，就是每条指令的解码与分派开销。把几条指令融成一条，能消掉
+其中一部分。</p>
+<p>难点在于判断<strong>哪些</strong>指令序列足够常见、值得这么优化。每加一条超级指令都要占用一个自己的操作码，
+而操作码的数量是有限的。加得太多，你就需要更大的操作码编码，那又会让代码变大、让<strong>所有</strong>指令
+的解码都变慢。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">  if (canAssign &amp;&amp; match(TOKEN_EQUAL)) {
+    expression();
+    emitBytes(OP_SET_PROPERTY, name);
+</pre><div class="source-file"><em>compiler.c</em><br>
+在 <em>dot</em>() 内</div>
+<pre class="insert">  } <span class="k">else</span> <span class="k">if</span> (<span class="i">match</span>(<span class="a">TOKEN_LEFT_PAREN</span>)) {
+    <span class="t">uint8_t</span> <span class="i">argCount</span> = <span class="i">argumentList</span>();
+    <span class="i">emitBytes</span>(<span class="a">OP_INVOKE</span>, <span class="i">name</span>);
+    <span class="i">emitByte</span>(<span class="i">argCount</span>);
+</pre><pre class="insert-after">  } else {
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 在 <em>dot</em>() 内</div>
+
+<p>编译器解析完属性名之后，我们去找一个左括号。如果匹配上了，就切到一条新的代码路径。在那里，
+我们完全像编译调用表达式那样编译参数列表。然后发射一条新的 <code>OP_INVOKE</code> 指令。它带两个操作数：</p>
+<ol>
+<li>
+<p>属性名在常量表里的索引。</p>
+</li>
+<li>
+<p>传给方法的实参个数。</p>
+</li>
+</ol>
+<p>换句话说，这一条指令把它所取代的 <code>OP_GET_PROPERTY</code> 和 <code>OP_CALL</code> 两条指令的操作数按顺序合在
+了一起。它真的是那两条指令的融合。我们来定义它。</p>
+<div class="codehilite"><pre class="insert-before">  OP_CALL,
+</pre><div class="source-file"><em>chunk.h</em><br>
+在枚举 <em>OpCode</em> 内</div>
+<pre class="insert">  <span class="a">OP_INVOKE</span>,
+</pre><pre class="insert-after">  OP_CLOSURE,
+</pre></div>
+<div class="source-file-narrow"><em>chunk.h</em>, 在枚举 <em>OpCode</em> 内</div>
+
+<p>再加进反汇编器：</p>
+<div class="codehilite"><pre class="insert-before">    case OP_CALL:
+      return byteInstruction(&quot;OP_CALL&quot;, chunk, offset);
+</pre><div class="source-file"><em>debug.c</em><br>
+在 <em>disassembleInstruction</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OP_INVOKE</span>:
+      <span class="k">return</span> <span class="i">invokeInstruction</span>(<span class="s">&quot;OP_INVOKE&quot;</span>, <span class="i">chunk</span>, <span class="i">offset</span>);
+</pre><pre class="insert-after">    case OP_CLOSURE: {
+</pre></div>
+<div class="source-file-narrow"><em>debug.c</em>, 在 <em>disassembleInstruction</em>() 内</div>
+
+<p>这是一种全新的、专门的指令格式，所以需要一点定制的反汇编逻辑。</p>
+<div class="codehilite"><div class="source-file"><em>debug.c</em><br>
+加在 <em>constantInstruction</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">int</span> <span class="i">invokeInstruction</span>(<span class="k">const</span> <span class="t">char</span>* <span class="i">name</span>, <span class="t">Chunk</span>* <span class="i">chunk</span>,
+                                <span class="t">int</span> <span class="i">offset</span>) {
+  <span class="t">uint8_t</span> <span class="i">constant</span> = <span class="i">chunk</span>-&gt;<span class="i">code</span>[<span class="i">offset</span> + <span class="n">1</span>];
+  <span class="t">uint8_t</span> <span class="i">argCount</span> = <span class="i">chunk</span>-&gt;<span class="i">code</span>[<span class="i">offset</span> + <span class="n">2</span>];
+  <span class="i">printf</span>(<span class="s">&quot;%-16s (%d args) %4d &#39;&quot;</span>, <span class="i">name</span>, <span class="i">argCount</span>, <span class="i">constant</span>);
+  <span class="i">printValue</span>(<span class="i">chunk</span>-&gt;<span class="i">constants</span>.<span class="i">values</span>[<span class="i">constant</span>]);
+  <span class="i">printf</span>(<span class="s">&quot;&#39;</span><span class="e">\n</span><span class="s">&quot;</span>);
+  <span class="k">return</span> <span class="i">offset</span> + <span class="n">3</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>debug.c</em>, 加在 <em>constantInstruction</em>() 之后</div>
+
+<p>我们读出两个操作数，然后把方法名和实参个数都打印出来。真正的好戏在解释器的字节码分派循环
+里开场。</p>
+<div class="codehilite"><pre class="insert-before">      }
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>run</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="a">OP_INVOKE</span>: {
+        <span class="t">ObjString</span>* <span class="i">method</span> = <span class="a">READ_STRING</span>();
+        <span class="t">int</span> <span class="i">argCount</span> = <span class="a">READ_BYTE</span>();
+        <span class="k">if</span> (!<span class="i">invoke</span>(<span class="i">method</span>, <span class="i">argCount</span>)) {
+          <span class="k">return</span> <span class="a">INTERPRET_RUNTIME_ERROR</span>;
+        }
+        <span class="i">frame</span> = &amp;<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">vm</span>.<span class="i">frameCount</span> - <span class="n">1</span>];
+        <span class="k">break</span>;
+      }
+</pre><pre class="insert-after">      case OP_CLOSURE: {
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>run</em>() 内</div>
+
+<p>大部分工作发生在 <code>invoke()</code> 里，我们待会儿就去看它。在这里，我们从第一个操作数里取出方法名，
+再读出实参个数这个操作数。然后把重活交给 <code>invoke()</code>。调用成功时那个函数返回 <code>true</code>。跟平常
+一样，返回 <code>false</code> 意味着发生了运行时错误。我们在这里检查这一点，一旦灾难降临就中止解释器。</p>
+<p>最后，假定调用成功，那么栈上就有了一个新的调用帧，于是我们刷新 <code>frame</code> 里缓存的当前帧副本。</p>
+<p>有意思的活儿在这儿：</p>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>callValue</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">bool</span> <span class="i">invoke</span>(<span class="t">ObjString</span>* <span class="i">name</span>, <span class="t">int</span> <span class="i">argCount</span>) {
+  <span class="t">Value</span> <span class="i">receiver</span> = <span class="i">peek</span>(<span class="i">argCount</span>);
+  <span class="t">ObjInstance</span>* <span class="i">instance</span> = <span class="a">AS_INSTANCE</span>(<span class="i">receiver</span>);
+  <span class="k">return</span> <span class="i">invokeFromClass</span>(<span class="i">instance</span>-&gt;<span class="i">klass</span>, <span class="i">name</span>, <span class="i">argCount</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>callValue</em>() 之后</div>
+
+<p>首先我们从栈上取下接收者。传给方法的实参在栈上位于它之上，所以我们往下探那么多个槽位。接着
+只要把对象转成实例、在它上面调用方法就行了。</p>
+<p>不过这确实假定了那个对象<strong>就是</strong>一个实例。和 <code>OP_GET_PROPERTY</code> 指令一样，我们也得处理用户
+错误地在类型不对的值上调用方法的情况。</p>
+<div class="codehilite"><pre class="insert-before">  Value receiver = peek(argCount);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>invoke</em>() 内</div>
+<pre class="insert">
+
+  <span class="k">if</span> (!<span class="a">IS_INSTANCE</span>(<span class="i">receiver</span>)) {
+    <span class="i">runtimeError</span>(<span class="s">&quot;Only instances have methods.&quot;</span>);
+    <span class="k">return</span> <span class="k">false</span>;
+  }
+
+</pre><pre class="insert-after">  ObjInstance* instance = AS_INSTANCE(receiver);
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>invoke</em>() 内</div>
+
+<p><span name="helper">这</span>是个运行时错误，所以我们报告它并退出。否则，我们取到实例的类，
+跳到另一个新工具函数去：</p>
+<aside name="helper">
+<p>你现在大概也猜到了，我们把这段代码拆成独立函数，是因为待会儿还要复用它——这个场景里是给
+<code>super</code> 调用用的。</p>
+</aside>
+<div class="codehilite"><div class="source-file"><em>vm.c</em><br>
+加在 <em>callValue</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">bool</span> <span class="i">invokeFromClass</span>(<span class="t">ObjClass</span>* <span class="i">klass</span>, <span class="t">ObjString</span>* <span class="i">name</span>,
+                            <span class="t">int</span> <span class="i">argCount</span>) {
+  <span class="t">Value</span> <span class="i">method</span>;
+  <span class="k">if</span> (!<span class="i">tableGet</span>(&amp;<span class="i">klass</span>-&gt;<span class="i">methods</span>, <span class="i">name</span>, &amp;<span class="i">method</span>)) {
+    <span class="i">runtimeError</span>(<span class="s">&quot;Undefined property &#39;%s&#39;.&quot;</span>, <span class="i">name</span>-&gt;<span class="i">chars</span>);
+    <span class="k">return</span> <span class="k">false</span>;
+  }
+  <span class="k">return</span> <span class="i">call</span>(<span class="a">AS_CLOSURE</span>(<span class="i">method</span>), <span class="i">argCount</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 加在 <em>callValue</em>() 之后</div>
+
+<p>这个函数把虚拟机实现 <code>OP_GET_PROPERTY</code> 和 <code>OP_CALL</code> 指令的逻辑按顺序合在了一起。首先我们
+在类的方法表里按名字查找方法。如果没找到，就报告那个运行时错误并退出。</p>
+<p>否则，我们取出方法的闭包，把一次对它的调用压进调用帧栈。我们不需要在堆上分配并初始化一个
+ObjBoundMethod。事实上，我们甚至不需要在栈上<span name="juggle">耍杂技</span>：接收者和
+方法实参已经待在它们该在的位置了。</p>
+<aside name="juggle">
+<p>这正是我们<strong>为什么</strong>用栈槽位零来存接收者的关键原因——调用方本来就是这么为一次方法调用组织
+栈的。一种高效的调用约定，是字节码虚拟机的性能里很重要的一环。</p>
+</aside>
+<p>现在启动虚拟机，跑一个会调用方法的小程序，你应该会看到跟之前一模一样的行为。但如果我们的活儿
+干对了，<strong>性能</strong>应该大有改善。我写了个小小的基准测试：做一批一万次方法调用，然后测试 10 秒内
+能跑完多少批。在我机器上，没有新的 <code>OP_INVOKE</code> 指令时，它跑完了 1,089 批；加上这项新优化，
+同样时间里跑完了 8,324 批。这是<strong>快了 7.6 倍</strong>，放到编程语言优化的语境里，是巨大的提升。</p>
+<p><span name="pat"></span></p>
+<aside name="pat">
+<p>我们不该<strong>太过</strong>使劲地拍自己的马屁。这项性能提升是相对于我们自己那套未优化的方法调用实现而言的，
+而那套实现相当慢。每一次方法调用都在堆上分配一次，是赢不了任何比赛的。</p>
+</aside><img src="image/methods-and-initializers/benchmark.png" alt="比较两组基准测试结果的条形图。" />
+<h3><a href="#调用字段" id="调用字段"><small>28&#8202;.&#8202;5&#8202;.&#8202;1</small>调用字段</a></h3>
+<p>优化的基本信条是：「你不可破坏正确性。」<span name="monte">用户</span>当然喜欢语言实现更快地
+给出答案，但前提是那必须是<strong>正确</strong>的答案。可惜，我们这套更快的调用实现没能守住这条原则：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Oops</span> {
+  <span class="i">init</span>() {
+    <span class="k">fun</span> <span class="i">f</span>() {
+      <span class="k">print</span> <span class="s">&quot;not a method&quot;</span>;
+    }
+
+    <span class="k">this</span>.<span class="i">field</span> = <span class="i">f</span>;
+  }
+}
+
+<span class="k">var</span> <span class="i">oops</span> = <span class="t">Oops</span>();
+<span class="i">oops</span>.<span class="i">field</span>();
+</pre></div>
+<p>最后一行看起来像方法调用。编译器也这么认为，乖乖地给它发射了一条 <code>OP_INVOKE</code> 指令。然而它不是。
+真正发生的是一次<strong>字段</strong>访问，返回一个函数，然后这个函数被调用。此刻我们的虚拟机没有正确
+执行它，而是在找不到名为 &ldquo;field&rdquo; 的方法时报了一个运行时错误。</p>
+<aside name="monte">
+<p>有些情况下，用户也许能接受这样的交换：程序有时给出错误的答案，换来显著更快的速度，或者更好
+的性能上界。这正是<a href="https://en.wikipedia.org/wiki/Monte_Carlo_algorithm"><strong>蒙特卡洛算法</strong></a>的地盘。对某些用例来说，这笔买卖划得来。</p>
+<p>不过关键在于，是用户<strong>主动选择</strong>使用这类算法之一。作为语言实现者，我们不能单方面决定牺牲
+用户程序的正确性。</p>
+</aside>
+<p>早先实现 <code>OP_GET_PROPERTY</code> 时，我们同时处理了字段访问和方法访问。要压掉这个新 bug，
+<code>OP_INVOKE</code> 也得这么做。</p>
+<div class="codehilite"><pre class="insert-before">  ObjInstance* instance = AS_INSTANCE(receiver);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>invoke</em>() 内</div>
+<pre class="insert">
+
+  <span class="t">Value</span> <span class="i">value</span>;
+  <span class="k">if</span> (<span class="i">tableGet</span>(&amp;<span class="i">instance</span>-&gt;<span class="i">fields</span>, <span class="i">name</span>, &amp;<span class="i">value</span>)) {
+    <span class="i">vm</span>.<span class="i">stackTop</span>[-<span class="i">argCount</span> - <span class="n">1</span>] = <span class="i">value</span>;
+    <span class="k">return</span> <span class="i">callValue</span>(<span class="i">value</span>, <span class="i">argCount</span>);
+  }
+
+</pre><pre class="insert-after">  return invokeFromClass(instance-&gt;klass, name, argCount);
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>invoke</em>() 内</div>
+
+<p>修起来很简单。在实例的类上查找方法之前，我们先找同名的字段。如果找到了字段，我们把它存到
+栈上接收者的位置、也就是实参列表的<strong>下面</strong>。这正是 <code>OP_GET_PROPERTY</code> 的行为，因为后一条指令
+是在后面那个括号里的实参列表求值之前执行的。</p>
+<p>然后我们试着像调用那个「但愿是可调用的」东西那样，调用这个字段的值。<code>callValue()</code> 辅助函数会
+检查值的类型，按合适的方式调用它；如果这个字段的值不是闭包这类可调用的类型，就报一个运行时
+错误。</p>
+<p>这就足以让我们的优化彻底安全了。遗憾的是，我们确实牺牲了一点性能。但有时候这就是你要付的价钱。
+你偶尔会遇到这种沮丧：要不是语言不允许某个讨厌的边界情况，你<strong>本可以</strong>做某个优化。但作为语言
+<span name="designer">实现者</span>，我们只能打手里拿到的这副牌。</p>
+<aside name="designer">
+<p>作为语言<strong>设计者</strong>，我们的角色完全不同。如果我们确实能支配这门语言本身，那么有时可以选择限制
+或改变语言，以换取优化空间。用户想要表达力强的语言，但也想要跑得快的实现。有时候牺牲一点能力、
+换来性能，是好的语言设计。</p>
+</aside>
+<p>我们在这里写的代码遵循了优化中一个典型的套路：</p>
+<ol>
+<li>
+<p>识别出一种常见的、对性能至关重要的操作或操作序列。这个场景里，是一次方法访问后紧跟
+一次调用。</p>
+</li>
+<li>
+<p>为这个模式加一个优化过的实现。就是我们的 <code>OP_INVOKE</code> 指令。</p>
+</li>
+<li>
+<p>用一些条件逻辑给优化代码加护栏，验证这个模式确实适用。如果适用，就留在快路径上；否则
+退回到更慢但更稳健的未优化行为。这里就是检查我们确实是在调用方法，而不是在访问字段。</p>
+</li>
+</ol>
+<p>随着你的语言工作从「让它<strong>勉强能跑</strong>」转向「让它跑得<strong>更快</strong>」，你会发现自己花在寻找这类模式、
+并为它们添加带护栏的优化上的时间越来越多。全职的虚拟机工程师，职业生涯里很大一部分时间都在
+这个循环里打转。</p>
+<p>不过眼下我们就打住这儿。到此，clox 已经支持了面向对象编程语言的大部分特性，而且性能也体面。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>在哈希表里查找一个类的 <code>init()</code> 方法是常数时间，但仍然相当慢。实现一个更快的办法。写个
+基准测试，量一量性能差距。</p>
+</li>
+<li>
+<p>在 Lox 这样的动态类型语言里，整个程序执行期间，一个调用点可能在若干个类上调用各种各样的
+方法。即便如此，实践中大多数时候，一个调用点在整轮运行中最终调用的都是同一个类上的同一个
+方法。即便语言说调用可以是多态的，大多数调用其实并不是。</p>
+<p>高级的语言实现如何基于这个观察来做优化？</p>
+</li>
+<li>
+<p>解释一条 <code>OP_INVOKE</code> 指令时，虚拟机得做两次哈希表查找。先找可能遮蔽方法的字段，只有
+失败时才去找方法。前一次检查很少有用——大多数字段里装的不是函数。但它是<strong>必要的</strong>，因为
+语言规定字段和方法用同一套语法访问，而字段会遮蔽方法。</p>
+<p>这是一个影响我们实现性能的<strong>语言选择</strong>。这个选择对吗？如果 Lox 是你的语言，你会怎么做？</p>
+</li>
+</ol>
+</div>
+<div class="design-note">
+<h2><a href="#design-note" id="design-note">设计说明：新意预算</a></h2>
+<p>我仍然记得第一次在 TRS-80 上写了一个小小的 BASIC 程序，让一台计算机做出它以前从没做过的事。
+那感觉就像拥有了超能力。第一次我东拼西凑出刚好够用的语法解析器和解释器，让我能用<strong>我自己
+的语言</strong>写一个小程序、指使计算机做件事——那感觉像是某种高阶版的元超能力。那种感觉曾经是、
+现在也仍然很美妙。</p>
+<p>我意识到，我可以设计出一门外观和行为都由我决定的语言。那感觉就像我一辈子都在一所要求穿
+校服的私立学校念书，然后有一天转学去了公立学校，可以想穿什么穿什么。我非得用花括号来划块吗？
+我可以用等号以外的东西做赋值吗？我可以不要类就搞出对象吗？多重继承<strong>外加</strong>多重方法？一门按参数
+个数做静态重载的动态语言？</p>
+<p>当然，我抓住这份自由一路狂奔。我做了最古怪、最任性的语言设计决定。泛型用撇号。实参之间不写
+逗号。重载决议可以在运行时失败。我做事与众不同，纯粹就为了不一样。</p>
+<p>这是种非常有趣的体验，我极力推荐。我们需要更多古怪的、前卫的编程语言。我想看更多的艺术
+语言。我现在偶尔还为了好玩做些古怪的玩具语言。</p>
+<p><strong>不过</strong>，如果你的目标是成功，而「成功」被定义为用户数量庞大，那么你的优先事项就必须不同。
+那种情况下，你的首要目标就是让你的语言装进尽可能多的大脑里。那<strong>真的很难</strong>。把一门语言的语法
+和语义从计算机搬进上万亿个神经元，需要投入巨大的人力。</p>
+<p>程序员天生珍惜自己的时间，对什么语言值得上传进自己的「湿件」也很谨慎。他们不想把时间
+浪费在一个最终对自己没用的语言上。所以，作为语言设计者，你的目标就是：用尽可能少的学习成本，
+把尽可能多的语言能力交给他们。</p>
+<p>一个自然的做法是<strong>简单</strong>。你的语言里的概念和特性越少，要学的东西总量就越少。这也是极简的
+<span name="dynamic">脚本</span>语言常常能找到成功的原因，尽管它们没有那些大型工业语言那么
+强大——它们更容易上手，而且一旦装进某个人的脑子里，用户就想一直用下去。</p>
+<aside name="dynamic">
+<p>具体来说，这是动态类型语言的一大优势。静态语言要求你先学<strong>两</strong>门语言——运行时的语义和静态
+类型系统——才能走到让计算机干活的阶段。动态语言只要求你学前者。</p>
+<p>最终，程序会大到静态分析的收益足以抵偿学习第二门静态语言的努力，但一开始时这笔买卖并不那么
+明显。</p>
+</aside>
+<p>简单带来的问题在于，光是砍特性往往会牺牲能力和表达力。找出哪些特性能以小博大，这本身是一门
+艺术；但很多时候，极简的语言就是做得更少。</p>
+<p>还有另一条路，能避开这个问题的大部分。诀窍是意识到：用户不必把你整门语言都装进脑子，
+<strong>只需要装他们还不具备的那部分</strong>。正如我在<a href="parsing-expressions.html#design-note">前面一篇设计说明</a>里提过的，学习的关键
+是把他们已经知道的东西和他们需要知道的东西之间的<strong>差值</strong>搬过去。</p>
+<p>你语言的很多潜在用户已经会别的某种编程语言。你的语言与那种语言共享的每一个特性，就学习而言
+基本是「免费」的。它已经在他们脑子里了，他们只需要认出你的语言做的是同一件事。</p>
+<p>换句话说，<strong>熟悉度</strong>是另一个降低语言采用成本的关键工具。当然，如果你把这个属性拉满，最后得到的
+就是一门跟某个已有语言一模一样的语言。那不是成功的配方，因为到那一步，用户根本没有任何理由
+切换到你的语言。</p>
+<p>所以你确实得提供一些有说服力的差异。别的语言做不到、或者至少做不到同样好的事情，你得有一些。
+我认为这是语言设计最根本的平衡动作之一：与其他语言相似会降低学习成本，而差异则抬高那些引人
+注目的优势。</p>
+<p>我把这个平衡想成一个<span name="idiosyncracy"><strong>新意预算</strong></span>——用史蒂夫·克拉布尼克的话
+说，是一份「<a href="https://words.steveklabnik.com/the-language-strangeness-budget">怪异度预算</a>」。用户对于「为了学一门新语言，愿意接受多少
+总量的新东西」，阈值很低。超了，他们就不来了。</p>
+<aside name="idiosyncracy">
+<p>心理学里有个相关概念叫<a href="https://en.wikipedia.org/wiki/Idiosyncrasy_credit"><strong>异类信用</strong></a>：意思是社会上的其他人会允许你有限度地
+偏离社会规范。你靠循规蹈矩、做出圈内人的举动来赚取这份信用，然后可以把它花在那些否则会招来
+侧目的怪癖行为上。换句话说，证明你是「自己人」，就给了你竖起怪旗的许可——但也就到这儿为止。</p>
+</aside>
+<p>每当你往语言里加一样别的语言没有的新东西，或者每当你的语言用一种不同的方式去做别的语言
+也在做的事，你都在花掉一部分预算。这没关系——你<strong>需要</strong>花，才能让你的语言有吸引力。但你的目标是
+<strong>明智地</strong>花。面对每一项特性或差异，先问自己它给你的语言增加了多少吸引力，然后批判性地
+评估它是否物有所值。这项改变是否足够有价值，值得你挥霍掉一部分新意预算？</p>
+<p>实践中我发现，这意味着你在语法上会相当保守，在语义上却更大胆。换一身新衣服固然好玩，但把
+花括号换成别的块分隔符，几乎不可能给语言增加多少真正的能力，却实实在在花掉了一些新意。语法
+上的差异很难自己挣回成本。</p>
+<p>另一方面，新的语义可以大幅提升语言的能力。多重方法、混入、特质、反射、依赖类型、运行时元
+编程等等，能把用户能用这门语言做到的事整个拉高一个量级。</p>
+<p>唉，像这样保守，远没有「把一切都改掉」那么好玩。但要不要追主流成功，归根结底是你自己决定。
+我们不必人人都去当电台放得响的流行乐队。如果你想让你的语言像自由爵士或者 drone metal，而且
+能接受按比例更小（但可能更铁杆）的听众规模，那就放手去做吧。</p>
+</div>
+
+<footer>
+<a href="superclasses.html" class="next">
+  下一章：&ldquo;超类&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

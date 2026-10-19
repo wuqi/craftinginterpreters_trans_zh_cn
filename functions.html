@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>函数 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">函数<small>10</small></a></h3>
+
+<ul>
+    <li><a href="#函数调用"><small>10.1</small> 函数调用</a></li>
+    <li><a href="#原生函数"><small>10.2</small> 原生函数</a></li>
+    <li><a href="#函数声明"><small>10.3</small> 函数声明</a></li>
+    <li><a href="#函数对象"><small>10.4</small> 函数对象</a></li>
+    <li><a href="#return-语句"><small>10.5</small> Return 语句</a></li>
+    <li><a href="#局部函数与闭包"><small>10.6</small> 局部函数与闭包</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="control-flow.html" title="控制流" class="left">&larr;&nbsp;上一</a>
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器">&uarr;&nbsp;返回</a>
+    <a href="resolving-and-binding.html" title="作用域解析与绑定" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="control-flow.html" title="控制流" class="prev">←</a>
+<a href="resolving-and-binding.html" title="作用域解析与绑定" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">函数<small>10</small></a></h3>
+
+<ul>
+    <li><a href="#函数调用"><small>10.1</small> 函数调用</a></li>
+    <li><a href="#原生函数"><small>10.2</small> 原生函数</a></li>
+    <li><a href="#函数声明"><small>10.3</small> 函数声明</a></li>
+    <li><a href="#函数对象"><small>10.4</small> 函数对象</a></li>
+    <li><a href="#return-语句"><small>10.5</small> Return 语句</a></li>
+    <li><a href="#局部函数与闭包"><small>10.6</small> 局部函数与闭包</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="control-flow.html" title="控制流" class="left">&larr;&nbsp;上一</a>
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器">&uarr;&nbsp;返回</a>
+    <a href="resolving-and-binding.html" title="作用域解析与绑定" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">10</div>
+  <h1>函数</h1>
+
+<blockquote>
+<p>人类心智的运作方式也是这样——把旧观念复合起来，变成新的结构，这些结构又变成新的
+观念，本身又能被复合，一圈又一圈永不停息，离每门语言赖以立足的、那些最基本最贴地的
+意象越来越远。</p>
+<p><cite>道格拉斯·R·霍夫施塔特（Douglas R. Hofstadter），《我是一个奇异的环》</cite></p>
+</blockquote>
+<p>本章标志着大量艰苦工作的收官。前几章各自都添上了有用的功能，但每一章也都提供了
+<span name="lambda">拼图</span>的一块碎片。我们会把这些碎片——表达式、语句、变量、控制流和
+词法作用域——再补上几块，把它们全部组装起来，支撑起真正的用户定义函数和函数调用。</p>
+<aside name="lambda"><img src="image/functions/lambda.png" alt="一个 lambda 拼图。" />
+</aside>
+<h2><a href="#函数调用" id="函数调用"><small>10&#8202;.&#8202;1</small>函数调用</a></h2>
+<p>C 风格的函数调用语法你肯定很熟悉，但它的文法比你可能意识到的更微妙。调用通常是指向具名
+函数的，比如：</p>
+<div class="codehilite"><pre><span class="i">average</span>(<span class="n">1</span>, <span class="n">2</span>);
+</pre></div>
+<p>但被调用函数的<span name="pascal">名字</span>其实并不是调用语法的一部分。被调用的那个
+东西——也就是<strong>被调用者（callee）</strong>——可以是任何求值结果为函数的表达式。（好吧，它确实
+得是个<strong>优先级</strong>相当高的表达式，不过用括号就能解决。）例如：</p>
+<aside name="pascal">
+<p>在 Pascal 里，名字<strong>就是</strong>调用语法的一部分。你只能调用具名函数，或者直接存放在变量里
+的函数。</p>
+</aside>
+<div class="codehilite"><pre><span class="i">getCallback</span>()();
+</pre></div>
+<p>这里有两个调用表达式。第一对括号的被调用者是 <code>getCallback</code>。但第二次调用把整个
+<code>getCallback()</code> 表达式当成了它的被调用者。真正表示函数调用的是跟在表达式后面的那对
+括号。你可以把一次调用大致看成一个以 <code>(</code> 开头的后缀运算符。</p>
+<p>这个「运算符」的优先级比任何其他运算符都高，连一元运算符都比不上。于是我们让 <code>unary</code>
+规则向上冒泡到一个新的 <code>call</code> 规则，把它安放进文法里。</p>
+<p><span name="curry"></span></p>
+<div class="codehilite"><pre><span class="i">unary</span>          → ( <span class="s">&quot;!&quot;</span> | <span class="s">&quot;-&quot;</span> ) <span class="i">unary</span> | <span class="i">call</span> ;
+<span class="i">call</span>           → <span class="i">primary</span> ( <span class="s">&quot;(&quot;</span> <span class="i">arguments</span>? <span class="s">&quot;)&quot;</span> )* ;
+</pre></div>
+<p>这条规则匹配一个基本表达式，后面跟零个或多个函数调用。如果没有括号，它解析出来的就是
+一个光秃秃的基本表达式。否则，每一次调用都由一对括号识别，里面跟一个可选的实参列表。
+实参列表的文法是：</p>
+<aside name="curry">
+<p>这条规则用 <code>*</code> 来允许匹配 <code>fn(1)(2)(3)</code> 这样的连续调用。这样的代码在 C 系语言里不常见，
+但在从 ML 派生出来的那个语言家族里很常见。在那里，定义一个接收多个实参的函数的常规
+做法，是把它写成一串嵌套函数。每个函数接收一个实参，返回一个新的函数；那个新函数消费
+下一个实参，再返回又一个函数，如此继续。最终，所有实参都被消费完之后，最后那个函数完成
+整个操作。</p>
+<p>这种风格叫作<strong>柯里化（currying）</strong>，得名自哈斯克尔·柯里（Haskell Curry）——就是那位
+名字出现在<strong>另</strong>一门著名函数式语言里的人物。这种风格被直接烙进语言语法里，所以在那里
+看起来不像在这儿这么古怪。</p>
+</aside>
+<div class="codehilite"><pre><span class="i">arguments</span>      → <span class="i">expression</span> ( <span class="s">&quot;,&quot;</span> <span class="i">expression</span> )* ;
+</pre></div>
+<p>这条规则要求至少有一个实参表达式，后面跟零个或多个其他表达式，每个前面都带一个逗号。
+为了处理零实参的调用，<code>call</code> 规则本身把整个 <code>arguments</code> 产生式当成可选的。</p>
+<p>我承认，对于那个常见得不能再常见的「零个或多个用逗号隔开的东西」模式，这文法看起来比
+你预期的更别扭。有些更精巧的元语法能处理得更好，但在我们这套 BNF 以及我见过的许多语言
+规范里，它就是这么笨重。</p>
+<p>在我们的语法树生成器里，我们加上一个<span name="call-ast">新节点</span>。</p>
+<div class="codehilite"><pre class="insert-before">      &quot;Binary   : Expr left, Token operator, Expr right&quot;,
+</pre><div class="source-file"><em>com\craftinginterpreters\tool\GenerateAst.java</em><br>
+在 <em>main</em>() 内</div>
+<pre class="insert">      <span class="s">&quot;Call     : Expr callee, Token paren, List&lt;Expr&gt; arguments&quot;</span>,
+</pre><pre class="insert-after">      &quot;Grouping : Expr expression&quot;,
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\tool\GenerateAst.java</em>, 在 <em>main</em>() 内</div>
+
+<aside name="call-ast">
+<p>新节点生成的代码见<a href="appendix-ii.html#调用表达式">附录二</a>。</p>
+</aside>
+<p>它存下被调用者表达式，以及一列实参表达式。它还存下右括号那个词法单元。当函数调用引发运行时
+错误时，我们会用到那个词法单元的位置。</p>
+<p>打开解析器。以前 <code>unary()</code> 直接跳到 <code>primary()</code>，现在把它改成调用——呃——<code>call()</code>。</p>
+<div class="codehilite"><pre class="insert-before">      return new Expr.Unary(operator, right);
+    }
+
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+在 <em>unary</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">    <span class="k">return</span> <span class="i">call</span>();
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 在 <em>unary</em>() 内, 替换 1 行</div>
+
+<p>它的定义是：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+加在 <em>unary</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">Expr</span> <span class="i">call</span>() {
+    <span class="t">Expr</span> <span class="i">expr</span> = <span class="i">primary</span>();
+
+    <span class="k">while</span> (<span class="k">true</span>) {<span name="while-true"> </span>
+      <span class="k">if</span> (<span class="i">match</span>(<span class="i">LEFT_PAREN</span>)) {
+        <span class="i">expr</span> = <span class="i">finishCall</span>(<span class="i">expr</span>);
+      } <span class="k">else</span> {
+        <span class="k">break</span>;
+      }
+    }
+
+    <span class="k">return</span> <span class="i">expr</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 加在 <em>unary</em>() 之后</div>
+
+<p>这里的代码和文法规则并没有完全对上。我挪动了几样东西，让代码更干净些——这算是手写解析器
+才享有的奢侈之一。不过它和我们解析中缀运算符的方式大致相同。首先，我们解析一个基本表达式，
+它是这次调用的「左操作数」。然后，每当我们看到一个 <code>(</code>，就调用 <code>finishCall()</code>，用先前解析
+出来的表达式作为被调用者来解析调用表达式。返回的表达式成为新的 <code>expr</code>，然后我们循环下去，
+看结果本身是否又被调用。</p>
+<aside name="while-true">
+<p>这段代码写成 <code>while (match(LEFT_PAREN))</code> 会比那个傻乎乎的 <code>while (true)</code> 加 <code>break</code>
+更简单。别担心，等我们后面把解析器扩展到能处理对象上的属性时，你就明白了。</p>
+</aside>
+<p>解析实参列表的代码在这个辅助函数里：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+加在 <em>unary</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">Expr</span> <span class="i">finishCall</span>(<span class="t">Expr</span> <span class="i">callee</span>) {
+    <span class="t">List</span>&lt;<span class="t">Expr</span>&gt; <span class="i">arguments</span> = <span class="k">new</span> <span class="t">ArrayList</span>&lt;&gt;();
+    <span class="k">if</span> (!<span class="i">check</span>(<span class="i">RIGHT_PAREN</span>)) {
+      <span class="k">do</span> {
+        <span class="i">arguments</span>.<span class="i">add</span>(<span class="i">expression</span>());
+      } <span class="k">while</span> (<span class="i">match</span>(<span class="i">COMMA</span>));
+    }
+
+    <span class="t">Token</span> <span class="i">paren</span> = <span class="i">consume</span>(<span class="i">RIGHT_PAREN</span>,
+                          <span class="s">&quot;Expect &#39;)&#39; after arguments.&quot;</span>);
+
+    <span class="k">return</span> <span class="k">new</span> <span class="t">Expr</span>.<span class="t">Call</span>(<span class="i">callee</span>, <span class="i">paren</span>, <span class="i">arguments</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 加在 <em>unary</em>() 之后</div>
+
+<p>这基本上就是把 <code>arguments</code> 文法规则翻译成代码，只不过我们还处理了零实参的情况。我们先通过
+看下一个词法单元是不是 <code>)</code> 来检查这种情况。如果是，我们就不去解析任何实参。</p>
+<p>否则，我们解析一个表达式，然后找逗号，表明那个表达式之后还有一个实参。只要每个表达式
+之后都能找到逗号，我们就一直这么做。当找不到逗号时，实参列表就一定结束了，我们吃掉那个
+预期的右括号。最后，我们把被调用者和那些实参包成一个调用 AST 节点。</p>
+<h3><a href="#最大实参数" id="最大实参数"><small>10&#8202;.&#8202;1&#8202;.&#8202;1</small>最大实参数</a></h3>
+<p>目前我们解析实参的那个循环没有任何上界。如果你想调用一个函数并传给它一百万个实参，解析器
+也不会有任何问题。我们要限制一下吗？</p>
+<p>别的语言各有各的做法。C 标准说，一个符合规范的实现必须支持函数调用<strong>至少</strong> 127 个实参，
+但没说有任何上限。Java 规范说一个方法可以接收<strong>不超过</strong> <span name="254">255</span> 个
+实参。</p>
+<aside name="254">
+<p>如果方法是实例方法，上限就是 25<strong>4</strong> 个实参。因为 <code>this</code>——方法的接收者——就像一个隐式
+传给方法的实参，所以它占掉了其中一个名额。</p>
+</aside>
+<p>我们的 Lox Java 解释器其实不太需要这个上限，但给实参个数设一个上限会简化<a href="a-bytecode-virtual-machine.html">第三部分</a>的
+字节码解释器。我们希望两个解释器在诸如这种古怪的边角情况下也互相兼容，所以也给 jlox 加上
+同样的限制。</p>
+<div class="codehilite"><pre class="insert-before">      do {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+在 <em>finishCall</em>() 内</div>
+<pre class="insert">        <span class="k">if</span> (<span class="i">arguments</span>.<span class="i">size</span>() &gt;= <span class="n">255</span>) {
+          <span class="i">error</span>(<span class="i">peek</span>(), <span class="s">&quot;Can&#39;t have more than 255 arguments.&quot;</span>);
+        }
+</pre><pre class="insert-after">        arguments.add(expression());
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 在 <em>finishCall</em>() 内</div>
+
+<p>注意这里的代码在遇到实参太多时<strong>报告</strong>一个错误，但它并不<strong>抛出</strong>这个错误。抛出是让我们进入
+恐慌模式的方式——如果解析器处于混乱状态、已经不知道自己在文法里的哪个位置了，那正是我们
+想要的。但这里解析器仍处于完全合法的状态——它只是找到了太多实参。所以它报告错误，然后
+继续往前干。</p>
+<h3><a href="#解释函数调用" id="解释函数调用"><small>10&#8202;.&#8202;1&#8202;.&#8202;2</small>解释函数调用</a></h3>
+<p>我们还没有任何可以调用的函数，所以先实现调用看起来有点怪，不过这个问题留到后面再说。
+首先，我们的解释器需要一个新的 import。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em></div>
+<pre class="insert"><span class="k">import</span> <span class="i">java.util.ArrayList</span>;
+</pre><pre class="insert-after">import java.util.List;
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em></div>
+
+<p>和往常一样，解释从一个新的 visit 方法开始，处理我们这个新的调用表达式节点。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+加在 <em>visitBinaryExpr</em>() 之后</div>
+<pre>  <span class="a">@Override</span>
+  <span class="k">public</span> <span class="t">Object</span> <span class="i">visitCallExpr</span>(<span class="t">Expr</span>.<span class="t">Call</span> <span class="i">expr</span>) {
+    <span class="t">Object</span> <span class="i">callee</span> = <span class="i">evaluate</span>(<span class="i">expr</span>.<span class="i">callee</span>);
+
+    <span class="t">List</span>&lt;<span class="t">Object</span>&gt; <span class="i">arguments</span> = <span class="k">new</span> <span class="t">ArrayList</span>&lt;&gt;();
+    <span class="k">for</span> (<span class="t">Expr</span> <span class="i">argument</span> : <span class="i">expr</span>.<span class="i">arguments</span>) {<span name="in-order"> </span>
+      <span class="i">arguments</span>.<span class="i">add</span>(<span class="i">evaluate</span>(<span class="i">argument</span>));
+    }
+
+    <span class="t">LoxCallable</span> <span class="i">function</span> = (<span class="t">LoxCallable</span>)<span class="i">callee</span>;
+    <span class="k">return</span> <span class="i">function</span>.<span class="i">call</span>(<span class="k">this</span>, <span class="i">arguments</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 加在 <em>visitBinaryExpr</em>() 之后</div>
+
+<p>首先，我们对被调用者的表达式求值。通常这个表达式只是一个标识符，按名字查找那个函数，
+但它也可能是别的东西。然后我们按顺序对每个实参表达式求值，把得到的值存进一个列表。</p>
+<aside name="in-order">
+<p>这又是那种微妙的语义选择。由于实参表达式可能有副作用，它们的求值顺序可能是用户可见的。
+即便如此，Scheme 和 C 这样的语言也不规定顺序。这给了编译器为了效率而重排的自由，但也意味
+着，如果实参不是按用户预期的顺序求值，用户可能会大感意外。</p>
+</aside>
+<p>一旦被调用者和实参都准备好了，剩下的就只是执行这次调用。我们把被调用者转型成一个 <span
+name="callable">LoxCallable</span>，然后在它上面调用 <code>call()</code> 方法。任何能被像函数一样
+调用的 Lox 对象，其 Java 表示都会实现这个接口。这自然包括用户定义的函数，也包括类对象，
+因为类是被「调用」来构造新实例的。我们不久之后还会为另一个用途使用它。</p>
+<aside name="callable">
+<p>我在名字前面加个「Lox」，是为了和 Java 标准库自己的 Callable 接口区分开。可惜，好听又
+简单的名字都已经被占掉了。</p>
+</aside>
+<p>这个新接口没多少东西。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\LoxCallable.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">import</span> <span class="i">java.util.List</span>;
+
+<span class="k">interface</span> <span class="t">LoxCallable</span> {
+  <span class="t">Object</span> <span class="i">call</span>(<span class="t">Interpreter</span> <span class="i">interpreter</span>, <span class="t">List</span>&lt;<span class="t">Object</span>&gt; <span class="i">arguments</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxCallable.java</em>, 新建文件</div>
+
+<p>我们把解释器传进去，以防实现 <code>call()</code> 的那个类需要它。我们也把求值后的实参值列表给它。
+接下来实现者的任务，就是返回这次调用表达式产生的值。</p>
+<h3><a href="#调用类型错误" id="调用类型错误"><small>10&#8202;.&#8202;1&#8202;.&#8202;3</small>调用类型错误</a></h3>
+<p>在动手实现 LoxCallable 之前，我们需要让那个 visit 方法更健壮一点。它目前对几种失败模式
+视而不见，而我们不能假装那些不会发生。首先，如果被调用者其实不是个能调用的东西，会怎样？
+比如你试着写这样：</p>
+<div class="codehilite"><pre><span class="s">&quot;totally not a function&quot;</span>();
+</pre></div>
+<p>在 Lox 里字符串是不可调用的。Lox 字符串的运行时表示是一个 Java 字符串，所以当我们把它
+转型成 LoxCallable 时，JVM 会抛出一个 ClassCastException。我们不想让解释器吐出一大段
+难看的 Java 堆栈跟踪然后死掉。所以我们需要自己先检查类型。</p>
+<div class="codehilite"><pre class="insert-before">    }
+
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+在 <em>visitCallExpr</em>() 内</div>
+<pre class="insert">    <span class="k">if</span> (!(<span class="i">callee</span> <span class="k">instanceof</span> <span class="t">LoxCallable</span>)) {
+      <span class="k">throw</span> <span class="k">new</span> <span class="t">RuntimeError</span>(<span class="i">expr</span>.<span class="i">paren</span>,
+          <span class="s">&quot;Can only call functions and classes.&quot;</span>);
+    }
+
+</pre><pre class="insert-after">    LoxCallable function = (LoxCallable)callee;
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 在 <em>visitCallExpr</em>() 内</div>
+
+<p>我们仍然抛异常，但现在是抛我们自己的异常类型，一个解释器知道该捕获并优雅报告的类型。</p>
+<h3><a href="#检查元数" id="检查元数"><small>10&#8202;.&#8202;1&#8202;.&#8202;4</small>检查元数</a></h3>
+<p>另一个问题关系到函数的<strong>元数</strong>。元数是「一个函数或操作期望多少个实参」这件事的高级说法。
+一元运算符元数为一，二元运算符为二，等等。对函数来说，元数由它声明的形参个数决定。</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">add</span>(<span class="i">a</span>, <span class="i">b</span>, <span class="i">c</span>) {
+  <span class="k">print</span> <span class="i">a</span> + <span class="i">b</span> + <span class="i">c</span>;
+}
+</pre></div>
+<p>这个函数定义了三个形参 <code>a</code>、<code>b</code> 和 <code>c</code>，所以它的元数是三，期望三个实参。那么如果你这样
+调用它会怎样：</p>
+<div class="codehilite"><pre><span class="i">add</span>(<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>); <span class="c">// 太多了。</span>
+<span class="i">add</span>(<span class="n">1</span>, <span class="n">2</span>);       <span class="c">// 太少了。</span>
+</pre></div>
+<p>不同语言对这个问题的做法不同。当然，大多数静态类型语言在编译期就检查，参数个数和函数
+元数不匹配就拒绝编译。JavaScript 会丢弃你多传的任何实参。如果你传得不够，它就用那个
+有点像 null 但又不完全是 null 的魔法值 <code>undefined</code> 填上缺失的形参。Python 更严格。实参
+列表太短或太长，它都抛运行时错误。</p>
+<p>我觉得后者是更好的做法。传错实参个数几乎总是个 bug，而且我自己就真犯过这个错。既然
+如此，实现越早把我的注意力吸引到它越好。所以对 Lox，我们采用 Python 的做法。在调用
+被调用者之前，我们检查实参列表的长度是否与被调用者的元数相符。</p>
+<div class="codehilite"><pre class="insert-before">    LoxCallable function = (LoxCallable)callee;
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+在 <em>visitCallExpr</em>() 内</div>
+<pre class="insert">    <span class="k">if</span> (<span class="i">arguments</span>.<span class="i">size</span>() != <span class="i">function</span>.<span class="i">arity</span>()) {
+      <span class="k">throw</span> <span class="k">new</span> <span class="t">RuntimeError</span>(<span class="i">expr</span>.<span class="i">paren</span>, <span class="s">&quot;Expected &quot;</span> +
+          <span class="i">function</span>.<span class="i">arity</span>() + <span class="s">&quot; arguments but got &quot;</span> +
+          <span class="i">arguments</span>.<span class="i">size</span>() + <span class="s">&quot;.&quot;</span>);
+    }
+
+</pre><pre class="insert-after">    return function.call(this, arguments);
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 在 <em>visitCallExpr</em>() 内</div>
+
+<p>这需要在 LoxCallable 接口上加一个新方法，让它报出自己的元数。</p>
+<div class="codehilite"><pre class="insert-before">interface LoxCallable {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\LoxCallable.java</em><br>
+在接口 <em>LoxCallable</em> 内</div>
+<pre class="insert">  <span class="t">int</span> <span class="i">arity</span>();
+</pre><pre class="insert-after">  Object call(Interpreter interpreter, List&lt;Object&gt; arguments);
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxCallable.java</em>, 在接口 <em>LoxCallable</em> 内</div>
+
+<p>我们<strong>完全可以</strong>把元数检查塞进 <code>call()</code> 的具体实现里。但既然以后会有多个类实现 LoxCallable，
+那样就会把重复的校验散落在几个类中。把它上提到 visit 方法里，我们就能在一处搞定。</p>
+<h2><a href="#原生函数" id="原生函数"><small>10&#8202;.&#8202;2</small>原生函数</a></h2>
+<p>理论上我们能调用函数了，可我们还没有函数可调。在讲用户定义的函数之前，正好可以介绍语言
+实现中一个至关重要、却常被忽略的方面——<span name="native"><strong>原生函数</strong></span>。
+这些函数由解释器暴露给用户代码，但它们是用宿主语言（我们的情况是 Java）实现的，而不是用
+被实现的语言（Lox）实现的。</p>
+<p>有时这些函数也换个称呼：<strong>primitive</strong>、<strong>external function</strong>，或者 <strong>foreign function</strong>。
+由于这些函数可以在用户程序运行期间被调用，它们构成了实现的运行时的一部分。很多编程语言
+书里对此一带而过，因为这类内容在概念上没什么意思。原生函数大多是些苦力活。</p>
+<aside name="native">
+<p>有意思的是，这些函数的两个名字——「原生（native）」和「外来（foreign）」——是反义词。
+也许这取决于选词的人站在什么视角。如果你把自己看成「生活」在运行时的实现（我们的情况是
+Java）之内，那么用那种语言写的函数就是「原生的」。但如果你抱着自己这门语言的<strong>用户</strong>的
+心态，那么运行时就是用某个别的「外来的」语言实现的。</p>
+<p>也可能「原生」指的是底层硬件的机器码语言。在 Java 里，「native」方法指的是用 C 或 C++
+实现、并编译成原生机器码的方法。</p><img src="image/functions/foreign.png" class="above" alt="一切只看你站在哪一边。" />
+</aside>
+<p>但说到让你的语言真的擅长做有用的事，你的实现所提供的原生函数是关键。它们提供了通往那些
+基础服务的通道，而所有程序都是用这些服务定义的。如果你不提供访问文件系统的原生函数，
+用户要写出一个读取并<span name="print">显示</span>文件的程序可有得苦了。</p>
+<aside name="print">
+<p>几乎每种语言都会提供的一个经典原生函数，是把文本打印到 stdout。在 Lox 里，我把 <code>print</code>
+做成了内置语句，好让我们在这一章之前的章节里就能把东西显示到屏幕上。</p>
+<p>有了函数之后，我们本可以把旧的 print 语法拆掉、换成一个原生函数，让语言更简洁一点。但
+那会意味着书前面的例子在后面章节的解释器上跑不了，反之亦然。所以，对这本书，我不动它。</p>
+<p>不过，如果你是在为你<strong>自己</strong>的语言写解释器，可能要考虑一下这件事。</p>
+</aside>
+<p>很多语言还允许用户提供自己的原生函数。实现这件事的机制叫作<strong>外部函数接口</strong>（<strong>FFI</strong>）、
+<strong>原生扩展</strong>、<strong>原生接口</strong>，或者诸如此类的名字。它们的好处是，让语言实现者不必为底层平台
+支持的每一样能力都提供访问接口。我们不会给 jlox 定义 FFI，但会加一个原生函数，让你看看
+它长什么样。</p>
+<h3><a href="#报告时间" id="报告时间"><small>10&#8202;.&#8202;2&#8202;.&#8202;1</small>报告时间</a></h3>
+<p>等我们到<a href="a-bytecode-virtual-machine.html">第三部分</a>、开始动手做一个效率高得多的 Lox 实现时，我们会深深关心性能。性能
+工作需要测量，而测量又意味着<strong>基准测试</strong>。基准测试是那些测量「跑一遍解释器的某个角落要
+花多少时间」的程序。</p>
+<p>我们可以测量「启动解释器、跑基准测试、退出」这一整段时间，但那会加进一大堆开销——JVM
+启动时间、操作系统的把戏等等。当然，那些开销确实也有影响，但如果你只是想验证对解释器某个
+部分的某项优化，你不会希望那些开销遮住你的结果。</p>
+<p>一个更好的办法，是让基准测试脚本自己去测量代码里两个点之间经过的时间。要做到这一点，一个
+Lox 程序得能够报时间。现在没法做到——没有对计算机底层时钟的访问，你不可能「从零开始」
+实现一个有用的时钟。</p>
+<p>所以我们要加上 <code>clock()</code>，一个返回「从某个固定时间点起过了多少秒」的原生函数。连续两次调用
+的结果之差，就告诉你两次调用之间过了多久。这个函数定义在全局作用域里，所以我们要确保
+解释器能访问它。</p>
+<div class="codehilite"><pre class="insert-before">class Interpreter implements Expr.Visitor&lt;Object&gt;,
+                             Stmt.Visitor&lt;Void&gt; {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+在类 <em>Interpreter</em> 内<br>
+替换 1 行</div>
+<pre class="insert">  <span class="k">final</span> <span class="t">Environment</span> <span class="i">globals</span> = <span class="k">new</span> <span class="t">Environment</span>();
+  <span class="k">private</span> <span class="t">Environment</span> <span class="i">environment</span> = <span class="i">globals</span>;
+</pre><pre class="insert-after">
+
+  void interpret(List&lt;Stmt&gt; statements) {
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 在类 <em>Interpreter</em> 内, 替换 1 行</div>
+
+<p>解释器里的 <code>environment</code> 字段会随着我们进入和退出局部作用域而变化。它跟踪的是<strong>当前</strong>环境。
+新加的这个 <code>globals</code> 字段持有对最外层全局环境的一份固定引用。</p>
+<p>当我们实例化一个 Interpreter 时，我们把这个原生函数塞进那个全局作用域里。</p>
+<div class="codehilite"><pre class="insert-before">  private Environment environment = globals;
+
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+在类 <em>Interpreter</em> 内</div>
+<pre class="insert">  <span class="t">Interpreter</span>() {
+    <span class="i">globals</span>.<span class="i">define</span>(<span class="s">&quot;clock&quot;</span>, <span class="k">new</span> <span class="t">LoxCallable</span>() {
+      <span class="a">@Override</span>
+      <span class="k">public</span> <span class="t">int</span> <span class="i">arity</span>() { <span class="k">return</span> <span class="n">0</span>; }
+
+      <span class="a">@Override</span>
+      <span class="k">public</span> <span class="t">Object</span> <span class="i">call</span>(<span class="t">Interpreter</span> <span class="i">interpreter</span>,
+                         <span class="t">List</span>&lt;<span class="t">Object</span>&gt; <span class="i">arguments</span>) {
+        <span class="k">return</span> (<span class="t">double</span>)<span class="t">System</span>.<span class="i">currentTimeMillis</span>() / <span class="n">1000.0</span>;
+      }
+
+      <span class="a">@Override</span>
+      <span class="k">public</span> <span class="t">String</span> <span class="i">toString</span>() { <span class="k">return</span> <span class="s">&quot;&lt;native fn&gt;&quot;</span>; }
+    });
+  }
+
+</pre><pre class="insert-after">  void interpret(List&lt;Stmt&gt; statements) {
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 在类 <em>Interpreter</em> 内</div>
+
+<p>这定义了一个名为 &ldquo;clock&rdquo; 的<span name="lisp-1">变量</span>。它的值是一个实现了 LoxCallable
+的 Java 匿名类。<code>clock()</code> 函数不接收实参，所以元数是零。<code>call()</code> 的实现调用对应的 Java
+函数，并把结果转换成以秒为单位的 double 值。</p>
+<aside name="lisp-1">
+<p>在 Lox 里，函数和变量占据同一个命名空间。在 Common Lisp 里，两者各活在自己的世界里。同名的
+函数和变量不会打架。你调用这个名字，就查函数；你引用它，就查变量。不过，当你确实想把一个
+函数当成一等值来引用时，还是得费一番周折。</p>
+<p>理查德·加布里埃尔（Richard P. Gabriel）和肯特·皮特曼（Kent Pitman）造出了 &ldquo;Lisp-1&rdquo; 这个
+说法，指 Scheme 那种把函数和变量放进同一个命名空间的语言；&ldquo;Lisp-2&rdquo; 则指 Common Lisp 那种
+把二者隔离开的语言。尽管这两个名字完全不透明，此后它们还是沿用下来了。Lox 是个 Lisp-1。</p>
+</aside>
+<p>如果我们想再加别的原生函数——读用户输入、处理文件等等——可以把它们各自做成一个实现
+LoxCallable 的匿名类。但对这本书来说，有这一个真的就够了。</p>
+<p>我们先别自己定义函数了，让我们的用户接手吧……</p>
+<h2><a href="#函数声明" id="函数声明"><small>10&#8202;.&#8202;3</small>函数声明</a></h2>
+<p>我们终于可以在当初引入变量的那个 <code>declaration</code> 规则里加一条新的产生式了。函数声明和变量
+一样，会绑定一个新的<span name="name">名字</span>。这意味着它只能出现在允许声明的地方。</p>
+<aside name="name">
+<p>一条具名的函数声明其实并不是一个单一的原子操作。它是两个不同步骤的语法糖：(1) 创建一个
+新的函数对象；(2) 把一个新变量绑定到它。如果 Lox 有匿名函数的语法，我们就不需要函数声明
+语句了。你可以直接这么写：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">add</span> = <span class="k">fun</span> (<span class="i">a</span>, <span class="i">b</span>) {
+  <span class="k">print</span> <span class="i">a</span> + <span class="i">b</span>;
+};
+</pre></div>
+<p>不过，既然具名函数是常见情形，我索性给 Lox 配上了好看的语法。</p>
+</aside>
+<div class="codehilite"><pre><span class="i">declaration</span>    → <span class="i">funDecl</span>
+               | <span class="i">varDecl</span>
+               | <span class="i">statement</span> ;
+</pre></div>
+<p>更新后的 <code>declaration</code> 规则引用了这条新规则：</p>
+<div class="codehilite"><pre><span class="i">funDecl</span>        → <span class="s">&quot;fun&quot;</span> <span class="i">function</span> ;
+<span class="i">function</span>       → <span class="t">IDENTIFIER</span> <span class="s">&quot;(&quot;</span> <span class="i">parameters</span>? <span class="s">&quot;)&quot;</span> <span class="i">block</span> ;
+</pre></div>
+<p>主规则 <code>funDecl</code> 用到了一条独立的辅助规则 <code>function</code>。一条函数<strong>声明语句</strong>就是 <code>fun</code> 关键字
+加上真正像函数的那一堆东西。等我们讲到类，会复用那条 <code>function</code> 规则来声明方法。方法看起来
+和函数声明相似，但前面没有 <span name="fun"><code>fun</code></span>。</p>
+<aside name="fun">
+<p>方法太有腔调了，fun 不起。</p>
+</aside>
+<p>函数本身是一个名字，加上括起来的形式参列表，再加上函数体。函数体总是一个花括号块，用的
+是块语句所用的同一条文法规则。形式参列表用这条规则：</p>
+<div class="codehilite"><pre><span class="i">parameters</span>     → <span class="t">IDENTIFIER</span> ( <span class="s">&quot;,&quot;</span> <span class="t">IDENTIFIER</span> )* ;
+</pre></div>
+<p>它和前面那条 <code>arguments</code> 规则很像，只是每个形参都是一个标识符，而不是表达式。解析器要嚼
+的新语法不少，但生成的 AST <span name="fun-ast">节点</span>还不算太糟。</p>
+<div class="codehilite"><pre class="insert-before">      &quot;Expression : Expr expression&quot;,
+</pre><div class="source-file"><em>com\craftinginterpreters\tool\GenerateAst.java</em><br>
+在 <em>main</em>() 内</div>
+<pre class="insert">      <span class="s">&quot;Function   : Token name, List&lt;Token&gt; params,&quot;</span> +
+                  <span class="s">&quot; List&lt;Stmt&gt; body&quot;</span>,
+</pre><pre class="insert-after">      &quot;If         : Expr condition, Stmt thenBranch,&quot; +
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\tool\GenerateAst.java</em>, 在 <em>main</em>() 内</div>
+
+<aside name="fun-ast">
+<p>新节点生成的代码见<a href="appendix-ii.html#函数语句">附录二</a>。</p>
+</aside>
+<p>一个函数节点有一个名字、一列形参（它们的名字），然后是函数体。我们把函数体存成花括号里
+包含的那些语句的列表。</p>
+<p>在解析器那边，我们把新的声明织进去。</p>
+<div class="codehilite"><pre class="insert-before">    try {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+在 <em>declaration</em>() 内</div>
+<pre class="insert">      <span class="k">if</span> (<span class="i">match</span>(<span class="i">FUN</span>)) <span class="k">return</span> <span class="i">function</span>(<span class="s">&quot;function&quot;</span>);
+</pre><pre class="insert-after">      if (match(VAR)) return varDeclaration();
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 在 <em>declaration</em>() 内</div>
+
+<p>和其他语句一样，函数是靠开头那个关键字识别的。遇到 <code>fun</code> 时，我们调用 <code>function</code>。这对应
+文法里的 <code>function</code> 规则，因为我们已经匹配并吃掉了 <code>fun</code> 关键字。我们一块一块地把这个方法
+搭起来，先从这段开始：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+加在 <em>expressionStatement</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">Stmt</span>.<span class="t">Function</span> <span class="i">function</span>(<span class="t">String</span> <span class="i">kind</span>) {
+    <span class="t">Token</span> <span class="i">name</span> = <span class="i">consume</span>(<span class="i">IDENTIFIER</span>, <span class="s">&quot;Expect &quot;</span> + <span class="i">kind</span> + <span class="s">&quot; name.&quot;</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 加在 <em>expressionStatement</em>() 之后</div>
+
+<p>目前它只吃掉函数名那个标识符词法单元。你可能对那个有点古怪的 <code>kind</code> 参数感到疑惑。就像我们
+复用文法规则一样，以后我们也会复用 <code>function()</code> 方法来解析类里的方法。到那时，我们会给
+<code>kind</code> 传入 &ldquo;method&rdquo;，好让错误信息针对正在解析的那种声明。</p>
+<p>接下来，我们解析形式参列表和包在外面的那对圆括号。</p>
+<div class="codehilite"><pre class="insert-before">    Token name = consume(IDENTIFIER, &quot;Expect &quot; + kind + &quot; name.&quot;);
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+在 <em>function</em>() 内</div>
+<pre class="insert">    <span class="i">consume</span>(<span class="i">LEFT_PAREN</span>, <span class="s">&quot;Expect &#39;(&#39; after &quot;</span> + <span class="i">kind</span> + <span class="s">&quot; name.&quot;</span>);
+    <span class="t">List</span>&lt;<span class="t">Token</span>&gt; <span class="i">parameters</span> = <span class="k">new</span> <span class="t">ArrayList</span>&lt;&gt;();
+    <span class="k">if</span> (!<span class="i">check</span>(<span class="i">RIGHT_PAREN</span>)) {
+      <span class="k">do</span> {
+        <span class="k">if</span> (<span class="i">parameters</span>.<span class="i">size</span>() &gt;= <span class="n">255</span>) {
+          <span class="i">error</span>(<span class="i">peek</span>(), <span class="s">&quot;Can&#39;t have more than 255 parameters.&quot;</span>);
+        }
+
+        <span class="i">parameters</span>.<span class="i">add</span>(
+            <span class="i">consume</span>(<span class="i">IDENTIFIER</span>, <span class="s">&quot;Expect parameter name.&quot;</span>));
+      } <span class="k">while</span> (<span class="i">match</span>(<span class="i">COMMA</span>));
+    }
+    <span class="i">consume</span>(<span class="i">RIGHT_PAREN</span>, <span class="s">&quot;Expect &#39;)&#39; after parameters.&quot;</span>);
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 在 <em>function</em>() 内</div>
+
+<p>这和处理调用实参的代码很像，只不过没有拆成辅助方法。外层 <code>if</code> 语句处理零形参的情况，内层
+<code>while</code> 循环则只要能找到分隔用的逗号就一直解析形参。结果是每个形参名字对应的词法单元列表。</p>
+<p>就像我们对函数调用的实参所做的那样，我们在解析期就校验：形参个数不能超过函数所允许的
+最大值。</p>
+<p>最后，我们解析函数体，把这一切包进一个函数节点。</p>
+<div class="codehilite"><pre class="insert-before">    consume(RIGHT_PAREN, &quot;Expect ')' after parameters.&quot;);
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+在 <em>function</em>() 内</div>
+<pre class="insert">
+
+    <span class="i">consume</span>(<span class="i">LEFT_BRACE</span>, <span class="s">&quot;Expect &#39;{&#39; before &quot;</span> + <span class="i">kind</span> + <span class="s">&quot; body.&quot;</span>);
+    <span class="t">List</span>&lt;<span class="t">Stmt</span>&gt; <span class="i">body</span> = <span class="i">block</span>();
+    <span class="k">return</span> <span class="k">new</span> <span class="t">Stmt</span>.<span class="t">Function</span>(<span class="i">name</span>, <span class="i">parameters</span>, <span class="i">body</span>);
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 在 <em>function</em>() 内</div>
+
+<p>注意我们在这里先吃掉了函数体开头那个 <code>{</code>，然后才调用 <code>block()</code>。因为 <code>block()</code> 假设括号词法单元
+已经被匹配掉了。在这里吃掉它，能让我们在找不到 <code>{</code> 时报出更精确的错误信息，因为那时我们知道
+它处在函数声明的语境里。</p>
+<h2><a href="#函数对象" id="函数对象"><small>10&#8202;.&#8202;4</small>函数对象</a></h2>
+<p>我们已经解析出了一些语法，通常这就准备好解释了，但首先我们得想清楚怎么在 Java 里表示一个
+Lox 函数。我们得记住形参，好在函数被调用时把它们绑定到实参值上。当然，我们还得保留函数体
+的代码，好在执行它。</p>
+<p>那基本就是 Stmt.Function 类。能不能直接用它？差不多，但不能完全。我们还需要一个实现
+LoxCallable 的类，才能调用它。我们不希望解释器的运行时阶段渗进前端的语法类里，所以不想让
+Stmt.Function 自己去实现它。于是我们把它包进一个新类。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">import</span> <span class="i">java.util.List</span>;
+
+<span class="k">class</span> <span class="t">LoxFunction</span> <span class="k">implements</span> <span class="t">LoxCallable</span> {
+  <span class="k">private</span> <span class="k">final</span> <span class="t">Stmt</span>.<span class="t">Function</span> <span class="i">declaration</span>;
+  <span class="t">LoxFunction</span>(<span class="t">Stmt</span>.<span class="t">Function</span> <span class="i">declaration</span>) {
+    <span class="k">this</span>.<span class="i">declaration</span> = <span class="i">declaration</span>;
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 新建文件</div>
+
+<p>我们这样实现 LoxCallable 的 <code>call()</code>：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+加在 <em>LoxFunction</em>() 之后</div>
+<pre>  <span class="a">@Override</span>
+  <span class="k">public</span> <span class="t">Object</span> <span class="i">call</span>(<span class="t">Interpreter</span> <span class="i">interpreter</span>,
+                     <span class="t">List</span>&lt;<span class="t">Object</span>&gt; <span class="i">arguments</span>) {
+    <span class="t">Environment</span> <span class="i">environment</span> = <span class="k">new</span> <span class="t">Environment</span>(<span class="i">interpreter</span>.<span class="i">globals</span>);
+    <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="i">declaration</span>.<span class="i">params</span>.<span class="i">size</span>(); <span class="i">i</span>++) {
+      <span class="i">environment</span>.<span class="i">define</span>(<span class="i">declaration</span>.<span class="i">params</span>.<span class="i">get</span>(<span class="i">i</span>).<span class="i">lexeme</span>,
+          <span class="i">arguments</span>.<span class="i">get</span>(<span class="i">i</span>));
+    }
+
+    <span class="i">interpreter</span>.<span class="i">executeBlock</span>(<span class="i">declaration</span>.<span class="i">body</span>, <span class="i">environment</span>);
+    <span class="k">return</span> <span class="k">null</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 加在 <em>LoxFunction</em>() 之后</div>
+
+<p>这寥寥几行代码，是我们解释器里最基本、最有力量的部分之一。正如我们在<a href="statements-and-state.html">讲语句和<span
+name="env">状态</span>的那一章</a>里看到的，管理名字环境是语言实现的核心部分。
+函数和它关系极深。</p>
+<aside name="env">
+<p>我们会在<a href="resolving-and-binding.html">下一章</a>里更深入地挖环境。</p>
+</aside>
+<p>形参是函数的核心，尤其是函数会<strong>封装</strong>自己的形参这一点——函数之外的任何代码都看不见它们。
+这意味着每个函数都有自己的环境，用来存放那些变量。</p>
+<p>更进一步，这个环境必须是动态创建的。每次函数<strong>调用</strong>都有自己的环境。否则递归就坏了。
+如果同时有多个对同一个函数的调用在进行，每一个都需要<strong>自己</strong>的环境，尽管它们全都是对同一个
+函数的调用。</p>
+<p>比如说，下面是一种拐弯抹角的数到三的办法：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">count</span>(<span class="i">n</span>) {
+  <span class="k">if</span> (<span class="i">n</span> &gt; <span class="n">1</span>) <span class="i">count</span>(<span class="i">n</span> - <span class="n">1</span>);
+  <span class="k">print</span> <span class="i">n</span>;
+}
+
+<span class="i">count</span>(<span class="n">3</span>);
+</pre></div>
+<p>想象我们在最内层那次嵌套调用正要打印 1 的那个点上把解释器暂停。外层那些要打印 2 和 3 的
+调用还没打印它们的值，所以内存里的某个地方一定还存着一些环境，记录着「<code>n</code> 在一个上下文
+里绑定到 3、在另一个上下文里绑定到 2、在最内层绑定到 1」这件事，像这样：</p><img src="image/functions/recursion.png" alt="每次递归调用各有各的环境。" />
+<p>这就是为什么我们在每次<strong>调用</strong>时创建新环境，而不是在函数<strong>声明</strong>时。前面那个 <code>call()</code> 方法
+就是这么做的。调用一开始，它创建一个新环境。然后它让形参列表和实参列表齐步前进。每一对上，
+它创建一个以形参命名的新变量，并把它绑定到实参的值上。</p>
+<p>所以，对于这样一个程序：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">add</span>(<span class="i">a</span>, <span class="i">b</span>, <span class="i">c</span>) {
+  <span class="k">print</span> <span class="i">a</span> + <span class="i">b</span> + <span class="i">c</span>;
+}
+
+<span class="i">add</span>(<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>);
+</pre></div>
+<p>在调用 <code>add()</code> 的那个位置上，解释器创建了这样一个东西：</p><img src="image/functions/binding.png" alt="把实参绑定到形参。" />
+<p>然后 <code>call()</code> 让解释器在这个新的函数局部环境里执行函数体。到此为止，当前环境一直是函数
+被调用的那个环境。现在，我们从那里瞬移进为这个函数新建的形参空间里。</p>
+<p>要把数据传进函数，所需要的就这么多。通过在执行函数体时使用不同的环境，对同一个函数的、
+代码相同的调用可以产生不同的结果。</p>
+<p>一旦函数体执行完毕，<code>executeBlock()</code> 丢弃那个函数局部环境，并恢复回调用点处之前生效的那个
+环境。最后，<code>call()</code> 返回 <code>null</code>，于是给调用方返回了 <code>nil</code>。（我们稍后会加上返回值。）</p>
+<p>从机械的角度看，代码相当简单。走几个列表。绑定几个新变量。调一个方法。但正是在这里，函数声明
+那结晶般的<strong>代码</strong>，变成了一个活生生的<strong>调用</strong>。这是我整本书里最喜欢的片段之一。如果你
+有兴致，尽管花点时间对着它冥想一下。</p>
+<p>完事？好。注意我们绑定形参时，假定形参列表和实参列表长度相同。这是安全的，因为
+<code>visitCallExpr()</code> 在调用 <code>call()</code> 之前检查了元数。它靠的就是函数报出自己的元数。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+加在 <em>LoxFunction</em>() 之后</div>
+<pre>  <span class="a">@Override</span>
+  <span class="k">public</span> <span class="t">int</span> <span class="i">arity</span>() {
+    <span class="k">return</span> <span class="i">declaration</span>.<span class="i">params</span>.<span class="i">size</span>();
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 加在 <em>LoxFunction</em>() 之后</div>
+
+<p>我们的对象表示差不多就是这些。既然已经在这儿了，我们不妨顺手实现一下 <code>toString()</code>。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+加在 <em>LoxFunction</em>() 之后</div>
+<pre>  <span class="a">@Override</span>
+  <span class="k">public</span> <span class="t">String</span> <span class="i">toString</span>() {
+    <span class="k">return</span> <span class="s">&quot;&lt;fn &quot;</span> + <span class="i">declaration</span>.<span class="i">name</span>.<span class="i">lexeme</span> + <span class="s">&quot;&gt;&quot;</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 加在 <em>LoxFunction</em>() 之后</div>
+
+<p>这样如果用户决定打印一个函数值，输出会好看些。</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">add</span>(<span class="i">a</span>, <span class="i">b</span>) {
+  <span class="k">print</span> <span class="i">a</span> + <span class="i">b</span>;
+}
+
+<span class="k">print</span> <span class="i">add</span>; <span class="c">// &quot;&lt;fn add&gt;&quot;.</span>
+</pre></div>
+<h3><a href="#解释函数声明" id="解释函数声明"><small>10&#8202;.&#8202;4&#8202;.&#8202;1</small>解释函数声明</a></h3>
+<p>我们很快会回来改进 LoxFunction，但现在这样就够开始用了。现在我们可以访问一条函数声明。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+加在 <em>visitExpressionStmt</em>() 之后</div>
+<pre>  <span class="a">@Override</span>
+  <span class="k">public</span> <span class="t">Void</span> <span class="i">visitFunctionStmt</span>(<span class="t">Stmt</span>.<span class="t">Function</span> <span class="i">stmt</span>) {
+    <span class="t">LoxFunction</span> <span class="i">function</span> = <span class="k">new</span> <span class="t">LoxFunction</span>(<span class="i">stmt</span>);
+    <span class="i">environment</span>.<span class="i">define</span>(<span class="i">stmt</span>.<span class="i">name</span>.<span class="i">lexeme</span>, <span class="i">function</span>);
+    <span class="k">return</span> <span class="k">null</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 加在 <em>visitExpressionStmt</em>() 之后</div>
+
+<p>这和我们解释其他字面量表达式的方式类似。我们取一个函数<strong>语法节点</strong>——函数的编译期表示——
+把它转换成它的运行时表示。在这里，是一个包装着语法节点的 LoxFunction。</p>
+<p>函数声明和其他字面量节点的不同之处在于，声明<strong>也</strong>会把产生的对象绑定到一个新变量上。所以
+在创建 LoxFunction 之后，我们在当前环境里创建一个新绑定，并把对它的引用存在那里。</p>
+<p>有了这个，我们就可以完全在 Lox 内部定义并调用自己的函数了。试试看：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">sayHi</span>(<span class="i">first</span>, <span class="i">last</span>) {
+  <span class="k">print</span> <span class="s">&quot;Hi, &quot;</span> + <span class="i">first</span> + <span class="s">&quot; &quot;</span> + <span class="i">last</span> + <span class="s">&quot;!&quot;</span>;
+}
+
+<span class="i">sayHi</span>(<span class="s">&quot;Dear&quot;</span>, <span class="s">&quot;Reader&quot;</span>);
+</pre></div>
+<p>我不知道你怎么想，但在我看来，这就是一门货真价实的编程语言。</p>
+<h2><a href="#return-语句" id="return-语句"><small>10&#8202;.&#8202;5</small>Return 语句</a></h2>
+<p>我们可以通过传形参把数据送进函数，却没办法把结果取<span name="hotel"><strong>出</strong></span>来。如果
+Lox 是像 Ruby 或 Scheme 那样面向表达式的语言，函数体就会是一个表达式，它的值隐式地就是函数
+的结果。但在 Lox 里，函数体是一列不产生值的语句，所以我们需要专门的语法来产出一个结果。
+换句话说，就是 <code>return</code> 语句。我敢说你已经猜到文法了。</p>
+<aside name="hotel">
+<p>数据的加州旅馆。</p>
+</aside>
+<div class="codehilite"><pre><span class="i">statement</span>      → <span class="i">exprStmt</span>
+               | <span class="i">forStmt</span>
+               | <span class="i">ifStmt</span>
+               | <span class="i">printStmt</span>
+               | <span class="i">returnStmt</span>
+               | <span class="i">whileStmt</span>
+               | <span class="i">block</span> ;
+
+<span class="i">returnStmt</span>     → <span class="s">&quot;return&quot;</span> <span class="i">expression</span>? <span class="s">&quot;;&quot;</span> ;
+</pre></div>
+<p>我们又多了——事实上是最后一条——挂在那个德高望重的 <code>statement</code> 规则下的产生式。一条
+<code>return</code> 语句就是 <code>return</code> 关键字，后面跟一个可选的表达式，以分号收尾。</p>
+<p>返回值是可选的，为的是支持从一个不返回有用值的函数里提前退出。在静态类型语言里，
+「void」函数不返回值，非 void 的返回。由于 Lox 是动态类型的，不存在真正的 void 函数。
+编译器没法阻止你从没有 <code>return</code> 语句的函数调用里取走返回值。</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">procedure</span>() {
+  <span class="k">print</span> <span class="s">&quot;don&#39;t return anything&quot;</span>;
+}
+
+<span class="k">var</span> <span class="i">result</span> = <span class="i">procedure</span>();
+<span class="k">print</span> <span class="i">result</span>; <span class="c">// ?</span>
+</pre></div>
+<p>这意味着每个 Lox 函数都必须返回<strong>某样东西</strong>，哪怕它一条 <code>return</code> 语句都没有。为此我们用
+<code>nil</code>，这也是 LoxFunction 的 <code>call()</code> 实现最后返回 <code>null</code> 的原因。同样地，如果你在 <code>return</code>
+语句里省略了值，我们干脆把它当作等价于：</p>
+<div class="codehilite"><pre><span class="k">return</span> <span class="k">nil</span>;
+</pre></div>
+<p>在我们的 AST 生成器里，我们加上一个<span name="return-ast">新节点</span>。</p>
+<div class="codehilite"><pre class="insert-before">      &quot;Print      : Expr expression&quot;,
+</pre><div class="source-file"><em>com\craftinginterpreters\tool\GenerateAst.java</em><br>
+在 <em>main</em>() 内</div>
+<pre class="insert">      <span class="s">&quot;Return     : Token keyword, Expr value&quot;</span>,
+</pre><pre class="insert-after">      &quot;Var        : Token name, Expr initializer&quot;,
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\tool\GenerateAst.java</em>, 在 <em>main</em>() 内</div>
+
+<aside name="return-ast">
+<p>新节点生成的代码见<a href="appendix-ii.html#return-语句">附录二</a>。</p>
+</aside>
+<p>它保留 <code>return</code> 关键字词法单元，这样我们就能用它的位置做错误报告，还保留被返回的值（如果有
+的话）。我们像解析其他语句那样解析它，先通过识别开头的关键字。</p>
+<div class="codehilite"><pre class="insert-before">    if (match(PRINT)) return printStatement();
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+在 <em>statement</em>() 内</div>
+<pre class="insert">    <span class="k">if</span> (<span class="i">match</span>(<span class="i">RETURN</span>)) <span class="k">return</span> <span class="i">returnStatement</span>();
+</pre><pre class="insert-after">    if (match(WHILE)) return whileStatement();
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 在 <em>statement</em>() 内</div>
+
+<p>它分岔到：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Parser.java</em><br>
+加在 <em>printStatement</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">Stmt</span> <span class="i">returnStatement</span>() {
+    <span class="t">Token</span> <span class="i">keyword</span> = <span class="i">previous</span>();
+    <span class="t">Expr</span> <span class="i">value</span> = <span class="k">null</span>;
+    <span class="k">if</span> (!<span class="i">check</span>(<span class="i">SEMICOLON</span>)) {
+      <span class="i">value</span> = <span class="i">expression</span>();
+    }
+
+    <span class="i">consume</span>(<span class="i">SEMICOLON</span>, <span class="s">&quot;Expect &#39;;&#39; after return value.&quot;</span>);
+    <span class="k">return</span> <span class="k">new</span> <span class="t">Stmt</span>.<span class="t">Return</span>(<span class="i">keyword</span>, <span class="i">value</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Parser.java</em>, 加在 <em>printStatement</em>() 之后</div>
+
+<p>在抓住先前吃掉的 <code>return</code> 关键字之后，我们去找一个值表达式。由于很多不同的词法单元都可能开始
+一个表达式，判断返回值是否<strong>存在</strong>很难。所以我们反过来检查它是不是<strong>不存在</strong>。既然分号
+不可能开始一个表达式，如果下一个词法单元就是分号，我们就知道一定没有值。</p>
+<h3><a href="#从调用中返回" id="从调用中返回"><small>10&#8202;.&#8202;5&#8202;.&#8202;1</small>从调用中返回</a></h3>
+<p>解释一条 <code>return</code> 语句很棘手。你可以从函数体内的任何地方返回，甚至从深深嵌在其他语句
+里面的地方返回。<code>return</code> 执行时，解释器需要从它当前所处的任何上下文里一路跳出去，让那次
+函数调用完成，像是某种被打了鸡血的控制流结构。</p>
+<p>比如说，假设我们正在运行这个程序，正要执行那条 <code>return</code> 语句：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">count</span>(<span class="i">n</span>) {
+  <span class="k">while</span> (<span class="i">n</span> &lt; <span class="n">100</span>) {
+    <span class="k">if</span> (<span class="i">n</span> == <span class="n">3</span>) <span class="k">return</span> <span class="i">n</span>; <span class="c">// &lt;--</span>
+    <span class="k">print</span> <span class="i">n</span>;
+    <span class="i">n</span> = <span class="i">n</span> + <span class="n">1</span>;
+  }
+}
+
+<span class="i">count</span>(<span class="n">1</span>);
+</pre></div>
+<p>Java 调用栈目前大致长这样：</p>
+<div class="codehilite"><pre>Interpreter.visitReturnStmt()
+Interpreter.visitIfStmt()
+Interpreter.executeBlock()
+Interpreter.visitBlockStmt()
+Interpreter.visitWhileStmt()
+Interpreter.executeBlock()
+LoxFunction.call()
+Interpreter.visitCallExpr()
+</pre></div>
+<p>我们需要从栈顶一路回到 <code>call()</code>。我不知道你怎么想，但对我来说这听起来就是异常。执行一条
+<code>return</code> 语句时，我们用一个异常让解释器穿过所有外层语句的 visit 方法一路退回到开始执行
+函数体的那段代码。</p>
+<p>我们这个新 AST 节点的 visit 方法长这样：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+加在 <em>visitPrintStmt</em>() 之后</div>
+<pre>  <span class="a">@Override</span>
+  <span class="k">public</span> <span class="t">Void</span> <span class="i">visitReturnStmt</span>(<span class="t">Stmt</span>.<span class="t">Return</span> <span class="i">stmt</span>) {
+    <span class="t">Object</span> <span class="i">value</span> = <span class="k">null</span>;
+    <span class="k">if</span> (<span class="i">stmt</span>.<span class="i">value</span> != <span class="k">null</span>) <span class="i">value</span> = <span class="i">evaluate</span>(<span class="i">stmt</span>.<span class="i">value</span>);
+
+    <span class="k">throw</span> <span class="k">new</span> <span class="t">Return</span>(<span class="i">value</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 加在 <em>visitPrintStmt</em>() 之后</div>
+
+<p>如果有返回值，我们对它求值；否则我们就用 <code>nil</code>。然后我们把这个值包进一个自定义异常类里
+抛出去。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Return.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">class</span> <span class="t">Return</span> <span class="k">extends</span> <span class="t">RuntimeException</span> {
+  <span class="k">final</span> <span class="t">Object</span> <span class="i">value</span>;
+
+  <span class="t">Return</span>(<span class="t">Object</span> <span class="i">value</span>) {
+    <span class="k">super</span>(<span class="k">null</span>, <span class="k">null</span>, <span class="k">false</span>, <span class="k">false</span>);
+    <span class="k">this</span>.<span class="i">value</span> = <span class="i">value</span>;
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Return.java</em>, 新建文件</div>
+
+<p>这个类把返回值和 Java 要求一个运行时异常类所必须的全套装饰包在一起。那个带着 <code>null</code> 和
+<code>false</code> 参数的奇怪 super 构造调用，关掉了我们不需要的某些 JVM 机制。既然我们把这个异常类
+用于<span name="exception">控制流</span>而不是真正的错误处理，就不需要堆栈跟踪这类开销。</p>
+<aside name="exception">
+<p>说在前头，我一般来说并不喜欢拿异常当控制流。但在一个深度递归的树遍历解释器里面，这是可行
+的办法。既然我们自己的语法树求值和 Java 调用栈绑得如此紧密，我们就偶尔不得不做一些重量级
+的调用栈操作，而异常是个顺手的工具。</p>
+</aside>
+<p>我们希望它一路退回到函数调用开始的地方，也就是 LoxFunction 里的 <code>call()</code> 方法。</p>
+<div class="codehilite"><pre class="insert-before">          arguments.get(i));
+    }
+
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+在 <em>call</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">    <span class="k">try</span> {
+      <span class="i">interpreter</span>.<span class="i">executeBlock</span>(<span class="i">declaration</span>.<span class="i">body</span>, <span class="i">environment</span>);
+    } <span class="k">catch</span> (<span class="t">Return</span> <span class="i">returnValue</span>) {
+      <span class="k">return</span> <span class="i">returnValue</span>.<span class="i">value</span>;
+    }
+</pre><pre class="insert-after">    return null;
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 在 <em>call</em>() 内, 替换 1 行</div>
+
+<p>我们把对 <code>executeBlock()</code> 的调用包在一个 try-catch 块里。当它捕获到一个 return 异常时，就把
+里面的值取出来，让它成为 <code>call()</code> 的返回值。如果它从未捕获到这类异常，就意味着函数执行到
+函数体末尾而没有碰到 <code>return</code> 语句。那种情况下，它隐式地返回 <code>nil</code>。</p>
+<p>来试试吧。我们终于有足够的本事来支持这个经典例子了——一个计算斐波那契数的递归函数：</p>
+<p><span name="slow"></span></p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">fib</span>(<span class="i">n</span>) {
+  <span class="k">if</span> (<span class="i">n</span> &lt;= <span class="n">1</span>) <span class="k">return</span> <span class="i">n</span>;
+  <span class="k">return</span> <span class="i">fib</span>(<span class="i">n</span> - <span class="n">2</span>) + <span class="i">fib</span>(<span class="i">n</span> - <span class="n">1</span>);
+}
+
+<span class="k">for</span> (<span class="k">var</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="n">20</span>; <span class="i">i</span> = <span class="i">i</span> + <span class="n">1</span>) {
+  <span class="k">print</span> <span class="i">fib</span>(<span class="i">i</span>);
+}
+</pre></div>
+<p>这个小程序几乎用到了我们过去几章实现的每一项语言特性——表达式、算术、分支、循环、变量、
+函数、函数调用、形参绑定和返回。</p>
+<aside name="slow">
+<p>你可能注意到它相当慢。显然，递归不是计算斐波那契数最高效的办法，但作为微基准测试，它很好地
+检验了我们解释器实现函数调用的速度。</p>
+<p>你看，答案是「不太快」。这没关系。我们的 C 解释器会更快。</p>
+</aside>
+<h2><a href="#局部函数与闭包" id="局部函数与闭包"><small>10&#8202;.&#8202;6</small>局部函数与闭包</a></h2>
+<p>我们的函数功能相当齐备，但还有一个洞要补。事实上这个缺口足够大，我们会把<a href="resolving-and-binding.html">下一章</a>的
+大部分时间花在封堵它上，不过我们可以在这里先起步。</p>
+<p>LoxFunction 的 <code>call()</code> 实现会创建一个新环境，用来绑定函数的形参。我给你看那段代码时，
+一带而过了某个要紧的问题：这个环境的<strong>父</strong>是什么？</p>
+<p>目前，它总是 <code>globals</code>，也就是最顶层的全局环境。这样，如果一个标识符没有在函数体自身
+内部定义，解释器就能到函数外面的全局作用域里去找它。在斐波那契那个例子里，解释器就是这样
+能在函数自己的体内查到对 <code>fib</code> 的递归调用的——<code>fib</code> 是一个全局变量。</p>
+<p>但别忘了，在 Lox 里，函数声明允许出现在任何能绑定名字的<strong>地方</strong>。这既包括一个 Lox
+脚本的顶层，也包括块内部或其他函数内部。Lox 支持<strong>局部函数</strong>，也就是定义在另一个函数里面、
+或者嵌套在某个块里面的函数。</p>
+<p>考虑这个经典例子：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">makeCounter</span>() {
+  <span class="k">var</span> <span class="i">i</span> = <span class="n">0</span>;
+  <span class="k">fun</span> <span class="i">count</span>() {
+    <span class="i">i</span> = <span class="i">i</span> + <span class="n">1</span>;
+    <span class="k">print</span> <span class="i">i</span>;
+  }
+
+  <span class="k">return</span> <span class="i">count</span>;
+}
+
+<span class="k">var</span> <span class="i">counter</span> = <span class="i">makeCounter</span>();
+<span class="i">counter</span>(); <span class="c">// &quot;1&quot;.</span>
+<span class="i">counter</span>(); <span class="c">// &quot;2&quot;.</span>
+</pre></div>
+<p>这里，<code>count()</code> 用到了 <code>i</code>，而 <code>i</code> 是在包含它的那个函数 <code>makeCounter()</code> 里、在它自己之外
+声明的。<code>makeCounter()</code> 返回对 <code>count()</code> 函数的一个引用，然后它自己的函数体就彻底执行完毕
+了。</p>
+<p>与此同时，顶层代码调用返回的那个 <code>count()</code> 函数。这会执行 <code>count()</code> 的函数体，给 <code>i</code> 赋值
+并读取它，尽管定义 <code>i</code> 的那个函数早就退出了。</p>
+<p>如果你以前从没见过带嵌套函数的语言，这可能看起来很疯狂，但用户确实期待它能工作。可惜，你
+现在去跑它，会在 <code>counter()</code> 那次调用里得到一个未定义变量错误，因为 <code>count()</code> 的函数体试图
+去查 <code>i</code>。那是当时实际的环境链长这样：</p><img src="image/functions/global.png" alt="从 count() 的函数体到全局作用域的环境链。" />
+<p>当我们调用 <code>count()</code> 时（通过存在 <code>counter</code> 里、对它的引用），我们为函数体创建一个新的空
+环境。那个环境的父是全局环境。我们丢掉了 <code>makeCounter()</code> 那个绑定着 <code>i</code> 的环境。</p>
+<p>我们把时间往回拨一点。这是我们刚在 <code>makeCounter()</code> 体内声明 <code>count()</code> 时，环境链的样子：</p><img src="image/functions/body.png" alt="makeCounter() 函数体内部的环境链。" />
+<p>所以在函数声明的那个位置上，我们能看见 <code>i</code>。但当我们从 <code>makeCounter()</code> 返回、退出它的函数体
+时，解释器丢弃了那个环境。既然解释器不把 <code>count()</code> 周围的环境保留下来，那就得靠函数对象
+自己把它抓在手里。</p>
+<p>这种数据结构叫作<span name="closure"><strong>闭包</strong></span>，因为它把函数声明处周围那些变量「闭合」
+住并保留了下来。闭包从 Lisp 早期就存在了，语言黑客们也想出了各式各样的实现办法。对 jlox，
+我们采用最简单可行的做法。在 LoxFunction 里，我们加一个字段来存放一个环境。</p>
+<aside name="closure">
+<p>「Closure」又是彼得·兰丁（Peter J. Landin）造出来的一个词。我猜在他出现之前，计算机科学家
+们只靠着原始的咕哝声和抓挠手势互相交流。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">  private final Stmt.Function declaration;
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+在类 <em>LoxFunction</em> 内</div>
+<pre class="insert">  <span class="k">private</span> <span class="k">final</span> <span class="t">Environment</span> <span class="i">closure</span>;
+
+</pre><pre class="insert-after">  LoxFunction(Stmt.Function declaration) {
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 在类 <em>LoxFunction</em> 内</div>
+
+<p>我们在构造函数里初始化它。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+在constructor <em>LoxFunction</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">  <span class="t">LoxFunction</span>(<span class="t">Stmt</span>.<span class="t">Function</span> <span class="i">declaration</span>, <span class="t">Environment</span> <span class="i">closure</span>) {
+    <span class="k">this</span>.<span class="i">closure</span> = <span class="i">closure</span>;
+</pre><pre class="insert-after">    this.declaration = declaration;
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 在constructor <em>LoxFunction</em>() 内, 替换 1 行</div>
+
+<p>当我们创建 LoxFunction 时，我们捕获当前的环境。</p>
+<div class="codehilite"><pre class="insert-before">  public Void visitFunctionStmt(Stmt.Function stmt) {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Interpreter.java</em><br>
+在 <em>visitFunctionStmt</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">    <span class="t">LoxFunction</span> <span class="i">function</span> = <span class="k">new</span> <span class="t">LoxFunction</span>(<span class="i">stmt</span>, <span class="i">environment</span>);
+</pre><pre class="insert-after">    environment.define(stmt.name.lexeme, function);
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Interpreter.java</em>, 在 <em>visitFunctionStmt</em>() 内, 替换 1 行</div>
+
+<p>这是函数被<strong>声明</strong>时、而非被<strong>调用</strong>时生效的那个环境，正是我们想要的。它表示函数声明周围的
+词法作用域。最后，当我们调用这个函数时，我们把那个环境用作本次调用的父环境，而不是直接
+指向 <code>globals</code>。</p>
+<div class="codehilite"><pre class="insert-before">                     List&lt;Object&gt; arguments) {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\LoxFunction.java</em><br>
+在 <em>call</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">    <span class="t">Environment</span> <span class="i">environment</span> = <span class="k">new</span> <span class="t">Environment</span>(<span class="i">closure</span>);
+</pre><pre class="insert-after">    for (int i = 0; i &lt; declaration.params.size(); i++) {
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\LoxFunction.java</em>, 在 <em>call</em>() 内, 替换 1 行</div>
+
+<p>这创造出一条环境链，从函数体出发，穿过函数声明时所处的那些环境，一路通到全局作用域。运行时
+的环境链和源代码的文本嵌套对应起来了，正如我们希望的那样。调用那个函数时的最终结果长这样：</p><img src="image/functions/closure.png" alt="带闭包的环境链。" />
+<p>现在你能看到，解释器需要的时候仍然能找到 <code>i</code>，因为它就在环境链的中间。现在去跑那个
+<code>makeCounter()</code> 的例子吧。它能用了！</p>
+<p>函数让我们能对代码做抽象、复用和组合。Lox 比它当初那个简陋的算术计算器强大了太多。可惜，
+在我们急着把闭包塞进去的过程中，我们让解释器漏进了一丁点儿动态作用域。在<a href="resolving-and-binding.html">下一章</a>里，
+我们会更深入地探索词法作用域，把那个洞堵上。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>我们的解释器仔细检查传给函数的实参个数是否与它所期望的形参个数相符。由于这个检查
+是在运行时、每次调用时都做，它有性能代价。Smalltalk 的实现没有这个问题。为什么没有？</p>
+</li>
+<li>
+<p>Lox 的函数声明语法做了两件相互独立的事：它创建一个函数，还把它绑定到一个名字上。这
+在你确实想给函数关联一个名字的常见情形里提升了易用性。但在函数式风格的代码里，你常常
+只是想创建一个函数，立刻把它传给另一个函数，或者返回出去。那种情况下，它不需要名字。</p>
+<p>鼓励函数式风格的语言通常都支持<strong>匿名函数</strong>或 <strong>lambda</strong>——一种不把函数绑定到名字上
+的表达式语法。给 Lox 加上匿名函数语法，让下面这段能跑起来：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">thrice</span>(<span class="i">fn</span>) {
+  <span class="k">for</span> (<span class="k">var</span> <span class="i">i</span> = <span class="n">1</span>; <span class="i">i</span> &lt;= <span class="n">3</span>; <span class="i">i</span> = <span class="i">i</span> + <span class="n">1</span>) {
+    <span class="i">fn</span>(<span class="i">i</span>);
+  }
+}
+
+<span class="i">thrice</span>(<span class="k">fun</span> (<span class="i">a</span>) {
+  <span class="k">print</span> <span class="i">a</span>;
+});
+<span class="c">// &quot;1&quot;.</span>
+<span class="c">// &quot;2&quot;.</span>
+<span class="c">// &quot;3&quot;.</span>
+</pre></div>
+<p>你怎么处理这种棘手的情形：匿名函数表达式出现在一个表达式语句里：</p>
+<div class="codehilite"><pre><span class="k">fun</span> () {};
+</pre></div>
+</li>
+<li>
+<p>这个程序有效吗？</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">scope</span>(<span class="i">a</span>) {
+  <span class="k">var</span> <span class="i">a</span> = <span class="s">&quot;local&quot;</span>;
+}
+</pre></div>
+<p>换句话说，函数的形参和它的局部变量在<strong>同一个</strong>作用域里，还是在外层作用域里？Lox
+是怎么做的？你熟悉的其它语言呢？你觉得一门语言<strong>应该</strong>怎么做？</p>
+</li>
+</ol>
+</div>
+
+<footer>
+<a href="resolving-and-binding.html" class="next">
+  下一章：&ldquo;作用域解析与绑定&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

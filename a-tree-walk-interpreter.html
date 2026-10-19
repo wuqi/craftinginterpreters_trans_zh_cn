@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>第一部分 树遍历解释器 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h2><small>II</small>第一部分 树遍历解释器</h2>
+
+<ul>
+    <li><a href="scanning.html"><small>4</small>扫描</a></li>
+    <li><a href="representing-code.html"><small>5</small>表示代码</a></li>
+    <li><a href="parsing-expressions.html"><small>6</small>语法解析表达式</a></li>
+    <li><a href="evaluating-expressions.html"><small>7</small>求值表达式</a></li>
+    <li><a href="statements-and-state.html"><small>8</small>语句与状态</a></li>
+    <li><a href="control-flow.html"><small>9</small>控制流</a></li>
+    <li><a href="functions.html"><small>10</small>函数</a></li>
+    <li><a href="resolving-and-binding.html"><small>11</small>作用域解析与绑定</a></li>
+    <li><a href="classes.html"><small>12</small>类</a></li>
+    <li><a href="inheritance.html"><small>13</small>继承</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="the-lox-language.html" title="Lox 语言" class="left">&larr;&nbsp;上一</a>
+    <a href="contents.html" title="目录">&uarr;&nbsp;返回</a>
+    <a href="scanning.html" title="扫描" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="the-lox-language.html" title="Lox 语言" class="prev">←</a>
+<a href="scanning.html" title="扫描" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h2><small>II</small>第一部分 树遍历解释器</h2>
+
+<ul>
+    <li><a href="scanning.html"><small>4</small>扫描</a></li>
+    <li><a href="representing-code.html"><small>5</small>表示代码</a></li>
+    <li><a href="parsing-expressions.html"><small>6</small>语法解析表达式</a></li>
+    <li><a href="evaluating-expressions.html"><small>7</small>求值表达式</a></li>
+    <li><a href="statements-and-state.html"><small>8</small>语句与状态</a></li>
+    <li><a href="control-flow.html"><small>9</small>控制流</a></li>
+    <li><a href="functions.html"><small>10</small>函数</a></li>
+    <li><a href="resolving-and-binding.html"><small>11</small>作用域解析与绑定</a></li>
+    <li><a href="classes.html"><small>12</small>类</a></li>
+    <li><a href="inheritance.html"><small>13</small>继承</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="the-lox-language.html" title="Lox 语言" class="left">&larr;&nbsp;上一</a>
+    <a href="contents.html" title="目录">&uarr;&nbsp;返回</a>
+    <a href="scanning.html" title="扫描" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">II</div>
+  <h1 class="part">第一部分 树遍历解释器</h1>
+
+<p>从这一部分起，我们开始写 jlox，也就是两个解释器里的第一个。编程语言是个庞大的话题，
+成堆的概念和术语要一口气塞进你脑子里。编程语言理论要求的思维严谨程度，你大概自打
+上次微积分期末考之后就没再调动过了。（好在本书里的理论不算多。）</p>
+<p>实现一个解释器会用到一些架构技巧和设计模式，这些在其他类型的应用里并不常见，所以
+我们也会顺带熟悉工程这一面。考虑到这些，我们会尽量把要写的代码写得简单、平实。</p>
+<p>用不到两千行干净的 Java 代码，我们就能为 Lox 写出一个完整的解释器，按我们规定的那样，
+把语言里的每一个特性都实现出来。前面几章会把解释器的各个阶段从头到尾过一遍——
+<a href="scanning.html">扫描</a>、<a href="parsing-expressions.html">语法解析</a>和<a href="evaluating-expressions.html">求值代码</a>。之后，我们一次
+添加一个语言特性，把一台简单的计算器逐步长成一门完整的脚本语言。</p>
+
+<footer>
+<a href="scanning.html" class="next">
+  下一章：&ldquo;扫描&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

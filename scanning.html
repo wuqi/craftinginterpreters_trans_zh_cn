@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>扫描 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">扫描<small>4</small></a></h3>
+
+<ul>
+    <li><a href="#解释器框架"><small>4.1</small> 解释器框架</a></li>
+    <li><a href="#词素与词法单元"><small>4.2</small> 词素与词法单元</a></li>
+    <li><a href="#正则语言与正则表达式"><small>4.3</small> 正则语言与正则表达式</a></li>
+    <li><a href="#scanner-类"><small>4.4</small> Scanner 类</a></li>
+    <li><a href="#认出词素"><small>4.5</small> 认出词素</a></li>
+    <li><a href="#更长的词素"><small>4.6</small> 更长的词素</a></li>
+    <li><a href="#保留字与标识符"><small>4.7</small> 保留字与标识符</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>隐式分号</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器" class="left">&larr;&nbsp;上一</a>
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器">&uarr;&nbsp;返回</a>
+    <a href="representing-code.html" title="表示代码" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器" class="prev">←</a>
+<a href="representing-code.html" title="表示代码" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">扫描<small>4</small></a></h3>
+
+<ul>
+    <li><a href="#解释器框架"><small>4.1</small> 解释器框架</a></li>
+    <li><a href="#词素与词法单元"><small>4.2</small> 词素与词法单元</a></li>
+    <li><a href="#正则语言与正则表达式"><small>4.3</small> 正则语言与正则表达式</a></li>
+    <li><a href="#scanner-类"><small>4.4</small> Scanner 类</a></li>
+    <li><a href="#认出词素"><small>4.5</small> 认出词素</a></li>
+    <li><a href="#更长的词素"><small>4.6</small> 更长的词素</a></li>
+    <li><a href="#保留字与标识符"><small>4.7</small> 保留字与标识符</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>隐式分号</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器" class="left">&larr;&nbsp;上一</a>
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器">&uarr;&nbsp;返回</a>
+    <a href="representing-code.html" title="表示代码" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">4</div>
+  <h1>扫描</h1>
+
+<blockquote>
+<p>要下口就下大口。凡是值得做的事，就值得做过头。</p>
+<p><cite>罗伯特·A. 海因莱因，《时间足够你爱》</cite></p>
+</blockquote>
+<p>任何编译器或解释器的第一步都是<span name="lexing">扫描</span>。扫描器把原始源码
+当成一串字符吃进来，再把它们归组成一串我们称为<strong>词法单元</strong>的块。它们就是构成语言语法的
+那些有意义的「词」和「标点」。</p>
+<aside name="lexing">
+<p>这些年，这活儿时而叫「扫描」，时而叫「词法分析」（lexing）。早在计算机还跟房车
+一样大、内存却比你的手表还少的年代，有些人用「扫描器」专指那段从磁盘读原始源码字符、
+缓冲进内存的代码，而「词法分析」则是后面的阶段——拿这些字符干正事。</p>
+<p>如今把源文件读进内存是件小事，所以在编译器里很少单独成一个阶段。也正因为如此，
+这两个词基本可以互换。</p>
+</aside>
+<p>扫描对我们来说也是个好的起点，因为这代码不难——基本上就是一个自以为很了不起的
+<code>switch</code> 语句。后面要啃更有意思的材料之前，先拿它热热身正合适。本章结束时，
+我们会拥有一个功能齐全、速度飞快的扫描器：给它任意一段 Lox 源码，它能吐出词法单元，
+下一章我们就把这些词法单元喂给解析器。</p>
+<h2><a href="#解释器框架" id="解释器框架"><small>4&#8202;.&#8202;1</small>解释器框架</a></h2>
+<p>这是我们第一个真正意义上的章节，所以在真正开始扫描代码之前，得先搭出解释器 jlox 的
+基本骨架。一切都从 Java 里的一个类开始。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">import</span> <span class="i">java.io.BufferedReader</span>;
+<span class="k">import</span> <span class="i">java.io.IOException</span>;
+<span class="k">import</span> <span class="i">java.io.InputStreamReader</span>;
+<span class="k">import</span> <span class="i">java.nio.charset.Charset</span>;
+<span class="k">import</span> <span class="i">java.nio.file.Files</span>;
+<span class="k">import</span> <span class="i">java.nio.file.Paths</span>;
+<span class="k">import</span> <span class="i">java.util.List</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="t">Lox</span> {
+  <span class="k">public</span> <span class="k">static</span> <span class="t">void</span> <span class="i">main</span>(<span class="t">String</span>[] <span class="i">args</span>) <span class="k">throws</span> <span class="t">IOException</span> {
+    <span class="k">if</span> (<span class="i">args</span>.<span class="i">length</span> &gt; <span class="n">1</span>) {
+      <span class="t">System</span>.<span class="i">out</span>.<span class="i">println</span>(<span class="s">&quot;Usage: jlox [script]&quot;</span>);
+      <span class="t">System</span>.<span class="i">exit</span>(<span class="n">64</span>);<span name="64"> </span>
+    } <span class="k">else</span> <span class="k">if</span> (<span class="i">args</span>.<span class="i">length</span> == <span class="n">1</span>) {
+      <span class="i">runFile</span>(<span class="i">args</span>[<span class="n">0</span>]);
+    } <span class="k">else</span> {
+      <span class="i">runPrompt</span>();
+    }
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 新建文件</div>
+
+<aside name="64">
+<p>退出码我用的是 UNIX <a href="https://www.freebsd.org/cgi/man.cgi?query=sysexits&amp;apropos=0&amp;sektion=0&amp;manpath=FreeBSD+4.3-RELEASE&amp;format=html"><code>sysexits.h</code></a> 头文件里定的约定。这是我能找到的
+最接近标准的东西。</p>
+</aside>
+<p>把它扔进一个文本文件，然后去开你的 IDE、你的 Makefile，或者随便什么现成的东西。
+我就在这儿等你。准备好了吗？好！开始！</p>
+<p>Lox 是门脚本语言，也就是说它直接从源码执行。我们的解释器支持两种跑代码的方式。
+如果在命令行启动 jlox 并给它一个文件路径，它就读这个文件并执行。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+加在 <em>main</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="k">static</span> <span class="t">void</span> <span class="i">runFile</span>(<span class="t">String</span> <span class="i">path</span>) <span class="k">throws</span> <span class="t">IOException</span> {
+    <span class="t">byte</span>[] <span class="i">bytes</span> = <span class="t">Files</span>.<span class="i">readAllBytes</span>(<span class="t">Paths</span>.<span class="i">get</span>(<span class="i">path</span>));
+    <span class="i">run</span>(<span class="k">new</span> <span class="t">String</span>(<span class="i">bytes</span>, <span class="t">Charset</span>.<span class="i">defaultCharset</span>()));
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 加在 <em>main</em>() 之后</div>
+
+<p>要是想跟你的解释器更私密地聊几句，也可以交互式地跑它。不带任何参数启动 jlox，
+它会把你丢进一个提示符，你可以一行一行地输入并执行代码。</p>
+<aside name="repl">
+<p>交互式提示符也叫「REPL」（读音像「rebel」，只不过多一个 p）。这名字来自 Lisp——
+在那儿实现一个 REPL，简单到只要把几个内置函数包在一个循环里：</p>
+<div class="codehilite"><pre>(<span class="i">print</span> (<span class="i">eval</span> (<span class="i">read</span>)))
+</pre></div>
+<p>从最里层的调用往外看：你<strong>读</strong>（R）一行输入，<strong>求值</strong>（E）它，<strong>打印</strong>（P）结果，
+然后<strong>循环</strong>（L）回去再来一遍。</p>
+</aside>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+加在 <em>runFile</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="k">static</span> <span class="t">void</span> <span class="i">runPrompt</span>() <span class="k">throws</span> <span class="t">IOException</span> {
+    <span class="t">InputStreamReader</span> <span class="i">input</span> = <span class="k">new</span> <span class="t">InputStreamReader</span>(<span class="t">System</span>.<span class="i">in</span>);
+    <span class="t">BufferedReader</span> <span class="i">reader</span> = <span class="k">new</span> <span class="t">BufferedReader</span>(<span class="i">input</span>);
+
+    <span class="k">for</span> (;;) {<span name="repl"> </span>
+      <span class="t">System</span>.<span class="i">out</span>.<span class="i">print</span>(<span class="s">&quot;&gt; &quot;</span>);
+      <span class="t">String</span> <span class="i">line</span> = <span class="i">reader</span>.<span class="i">readLine</span>();
+      <span class="k">if</span> (<span class="i">line</span> == <span class="k">null</span>) <span class="k">break</span>;
+      <span class="i">run</span>(<span class="i">line</span>);
+    }
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 加在 <em>runFile</em>() 之后</div>
+
+<p><code>readLine()</code> 函数，名字取得真是贴心，从命令行读一行用户输入并返回结果。要结束一个交互式的
+命令行程序，通常敲 Control-D。这会给程序发一个「文件结束」信号。这时候 <code>readLine()</code>
+返回 <code>null</code>，所以我们检查这一点来退出循环。</p>
+<p>提示符和文件运行器都只是这个核心函数的薄包装：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+加在 <em>runPrompt</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="k">static</span> <span class="t">void</span> <span class="i">run</span>(<span class="t">String</span> <span class="i">source</span>) {
+    <span class="t">Scanner</span> <span class="i">scanner</span> = <span class="k">new</span> <span class="t">Scanner</span>(<span class="i">source</span>);
+    <span class="t">List</span>&lt;<span class="t">Token</span>&gt; <span class="i">tokens</span> = <span class="i">scanner</span>.<span class="i">scanTokens</span>();
+
+<span class="c">// 眼下只把词法单元打印出来。</span>
+    <span class="k">for</span> (<span class="t">Token</span> <span class="i">token</span> : <span class="i">tokens</span>) {
+      <span class="t">System</span>.<span class="i">out</span>.<span class="i">println</span>(<span class="i">token</span>);
+    }
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 加在 <em>runPrompt</em>() 之后</div>
+
+<p>它现在还没什么用，因为解释器还没写，但一步一步来嘛，你知道的？眼下它把我们即将
+写出来的扫描器所吐出的词法单元打印出来，好让我们看看有没有进展。</p>
+<h3><a href="#错误处理" id="错误处理"><small>4&#8202;.&#8202;1&#8202;.&#8202;1</small>错误处理</a></h3>
+<p>搭框架的同时，还有一块关键的基础设施：<strong>错误处理</strong>。教科书有时会一带而过，
+因为这更偏实际问题而不是正式的计算机科学问题。但如果你在意造出一门<strong>好用</strong>的语言，
+那优雅地处理错误就至关重要。</p>
+<p>我们的语言为对付错误所提供的工具，在它的用户界面里占了很大比重。用户代码正常跑着的时候，
+他们根本不会想起我们的语言——脑子里全是<strong>他们自己的程序</strong>。通常只有出事的时候，
+他们才会注意到我们的实现。</p>
+<p><span name="errors">这时候</span>，就得由我们来把用户需要的信息全给他，让他明白出了什么事，
+再温和地把他引回他想去的地方。要做好这件事，就得在整个解释器的实现里都想着错误处理——
+从现在开始。</p>
+<aside name="errors">
+<p>话虽如此，就<strong>这个</strong>解释器来说，我们要造的东西光剩个骨架。我很想聊聊交互式
+调试器、静态分析器之类的好玩东西，但笔墨就那么多。</p>
+</aside>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+加在 <em>run</em>() 之后</div>
+<pre>  <span class="k">static</span> <span class="t">void</span> <span class="i">error</span>(<span class="t">int</span> <span class="i">line</span>, <span class="t">String</span> <span class="i">message</span>) {
+    <span class="i">report</span>(<span class="i">line</span>, <span class="s">&quot;&quot;</span>, <span class="i">message</span>);
+  }
+
+  <span class="k">private</span> <span class="k">static</span> <span class="t">void</span> <span class="i">report</span>(<span class="t">int</span> <span class="i">line</span>, <span class="t">String</span> <span class="i">where</span>,
+                             <span class="t">String</span> <span class="i">message</span>) {
+    <span class="t">System</span>.<span class="i">err</span>.<span class="i">println</span>(
+        <span class="s">&quot;[line &quot;</span> + <span class="i">line</span> + <span class="s">&quot;] Error&quot;</span> + <span class="i">where</span> + <span class="s">&quot;: &quot;</span> + <span class="i">message</span>);
+    <span class="i">hadError</span> = <span class="k">true</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 加在 <em>run</em>() 之后</div>
+
+<p>这个 <code>error()</code> 函数和它的 <code>report()</code> 帮手，会告诉用户某一行上出了个语法错误。这真的
+只是「你<strong>有</strong>错误报告」这件事的最低门槛。想象一下，你不小心在某个函数调用里留了个
+多余逗号，然后解释器打印出：</p>
+<div class="codehilite"><pre>Error: Unexpected &quot;,&quot; somewhere in your code. Good luck finding it!
+</pre></div>
+<p>这可没什么帮助。我们至少得指出是哪一行。更好一点的做法是给出起始列和结束列，好让他们知道是
+行内<strong>哪里</strong>。比<strong>那</strong>更好的是把<strong>出错那行显示给</strong>用户，比如：</p>
+<div class="codehilite"><pre>Error: Unexpected &quot;,&quot; in argument list.
+
+    15 | function(first, second,);
+                               ^-- Here.
+</pre></div>
+<p>我很想在这本书里实现个那样的东西，但老实说那是一大堆脏兮兮的字符串操作代码。
+对用户很有用，但在书里读起来一点都不好玩，技术上也没什么意思。所以我们只留行号。
+在你自己的解释器里，请照我说的做，别照我做的做。</p>
+<p>我们把这个错误报告函数塞进主 Lox 类，首要原因就是那个 <code>hadError</code> 字段。它定义在这儿：</p>
+<div class="codehilite"><pre class="insert-before">public class Lox {
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+在类 <em>Lox</em> 内</div>
+<pre class="insert">  <span class="k">static</span> <span class="t">boolean</span> <span class="i">hadError</span> = <span class="k">false</span>;
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 在类 <em>Lox</em> 内</div>
+
+<p>我们用它来确保不会去执行已知有错的代码。另外，它还让我们能像个体面的命令行公民那样
+用非零退出码退出。</p>
+<div class="codehilite"><pre class="insert-before">    run(new String(bytes, Charset.defaultCharset()));
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+在 <em>runFile</em>() 内</div>
+<pre class="insert">
+
+<span class="c">// 用退出码表示出错。</span>
+    <span class="k">if</span> (<span class="i">hadError</span>) <span class="t">System</span>.<span class="i">exit</span>(<span class="n">65</span>);
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 在 <em>runFile</em>() 内</div>
+
+<p>在交互循环里我们得重置这个标志。用户要是搞错了，不该整个会话都陪葬。</p>
+<div class="codehilite"><pre class="insert-before">      run(line);
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Lox.java</em><br>
+在 <em>runPrompt</em>() 内</div>
+<pre class="insert">      <span class="i">hadError</span> = <span class="k">false</span>;
+</pre><pre class="insert-after">    }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Lox.java</em>, 在 <em>runPrompt</em>() 内</div>
+
+<p>我把错误报告挪到这儿来，而不是塞进扫描器以及可能出错的其他阶段，另一个原因是要提醒你：
+把<strong>产生</strong>错误的代码和<strong>报告</strong>错误的代码分开，是好的工程实践。</p>
+<p>前端会有各个阶段去发现错误，但「怎么呈现给用户」其实不是它们的活。在一个功能齐全的
+语言实现里，你很可能会用多种方式来显示错误：打到 stderr、显示在 IDE 的错误窗口、
+记进日志文件等等。你不想让这些代码糊得到处都是，糊满你的扫描器和解析器。</p>
+<p>理想情况下，我们该有个真正的抽象——某种<span name="reporter">「错误报告器」</span>接口，
+传给扫描器和解析器，这样就能替换不同的报告策略。在我们这个简单的解释器里我没这么做，
+但我至少把错误报告的代码挪进了另一个类。</p>
+<aside name="reporter">
+<p>我最初实现 jlox 的时候确实做了这么个东西。后来我把它拆了，因为对于这本书里这个
+最小化的解释器来说，它显得过度设计了。</p>
+</aside>
+<p>有了这点简陋的错误处理，应用外壳就绪了。等我们有了带 <code>scanTokens()</code> 方法的
+Scanner 类，就能开始跑了。在那之前，我们先把「词法单元到底是什么」说得更精确一点。</p>
+<h2><a href="#词素与词法单元" id="词素与词法单元"><small>4&#8202;.&#8202;2</small>词素与词法单元</a></h2>
+<p>这是一行 Lox 代码：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">language</span> = <span class="s">&quot;lox&quot;</span>;
+</pre></div>
+<p>这里 <code>var</code> 是声明变量的关键字。那三个字符的序列「v-a-r」有含义。但如果从 <code>language</code>
+中间抠出三个字母，比如「g-u-a」，它们单独看就没意义了。</p>
+<p>这就是词法分析在做的事。我们的活儿是扫过那串字符，把它们归组成还能表示点什么的
+最小序列。每个这样的字符团块叫做一个<strong>词素</strong>。在上面那行代码里，词素是：</p><img src="image/scanning/lexemes.png" alt="'var', 'language', '=', 'lox', ';'" />
+<p>词素只是源码的原始子串。然而就在把字符序列归组成词素的过程中，我们还顺手捞到了一些
+别的有用信息。把词素和那些别的数据捆在一起，产物就是一个词法单元。它包含诸如：</p>
+<h3><a href="#词法单元类型" id="词法单元类型"><small>4&#8202;.&#8202;2&#8202;.&#8202;1</small>词法单元类型</a></h3>
+<p>关键字是语言语法形状的一部分，所以解析器里常有这种代码：「如果下一个词法单元是
+<code>while</code> 就……」这意味着解析器不光要知道它拿到了某个标识符的词素，还得知道那是个
+<strong>保留</strong>字，以及是<strong>哪一个</strong>关键字。</p>
+<p><span name="ugly">解析器</span>当然可以直接拿原始词素比字符串来给词法单元分类，但那又慢又难看。所以我们在
+认出某个词素的同时，也记下它代表的是<strong>哪一类</strong>词素。每个关键字、运算符、标点符号、
+字面量类型，我们都准备一个专门的类型。</p>
+<aside name="ugly">
+<p>说到底，字符串比较最后还是在逐个看字符，那不正是扫描器的活吗？</p>
+</aside>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\TokenType.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">enum</span> <span class="t">TokenType</span> {
+<span class="c">// 单字符词法单元。</span>
+  <span class="i">LEFT_PAREN</span>, <span class="i">RIGHT_PAREN</span>, <span class="i">LEFT_BRACE</span>, <span class="i">RIGHT_BRACE</span>,
+  <span class="i">COMMA</span>, <span class="i">DOT</span>, <span class="i">MINUS</span>, <span class="i">PLUS</span>, <span class="i">SEMICOLON</span>, <span class="i">SLASH</span>, <span class="i">STAR</span>,
+
+<span class="c">// 一或两个字符的词法单元。</span>
+  <span class="i">BANG</span>, <span class="i">BANG_EQUAL</span>,
+  <span class="i">EQUAL</span>, <span class="i">EQUAL_EQUAL</span>,
+  <span class="i">GREATER</span>, <span class="i">GREATER_EQUAL</span>,
+  <span class="i">LESS</span>, <span class="i">LESS_EQUAL</span>,
+
+<span class="c">// 字面量。</span>
+  <span class="i">IDENTIFIER</span>, <span class="i">STRING</span>, <span class="i">NUMBER</span>,
+
+<span class="c">// 关键字。</span>
+  <span class="i">AND</span>, <span class="i">CLASS</span>, <span class="i">ELSE</span>, <span class="i">FALSE</span>, <span class="i">FUN</span>, <span class="i">FOR</span>, <span class="i">IF</span>, <span class="i">NIL</span>, <span class="i">OR</span>,
+  <span class="i">PRINT</span>, <span class="i">RETURN</span>, <span class="i">SUPER</span>, <span class="i">THIS</span>, <span class="i">TRUE</span>, <span class="i">VAR</span>, <span class="i">WHILE</span>,
+
+  <span class="i">EOF</span>
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\TokenType.java</em>, 新建文件</div>
+
+<h3><a href="#字面量值" id="字面量值"><small>4&#8202;.&#8202;2&#8202;.&#8202;2</small>字面量值</a></h3>
+<p>字面量值也有词素——数字啦字符串啦这类。既然扫描器本来就得逐个走过字面量里的字符才能
+正确认出它，那它也可以顺手把这个值的文本表示，转换成之后解释器要用的那个活生生的
+运行时对象。</p>
+<h3><a href="#位置信息" id="位置信息"><small>4&#8202;.&#8202;2&#8202;.&#8202;3</small>位置信息</a></h3>
+<p>早先我还在大肆宣扬错误处理的时候，我们看到得告诉用户错误发生在<strong>哪里</strong>。位置追踪从
+这儿开始。在这个简单的解释器里，我们只记词法单元出现在哪一行，但更精巧的实现还会
+带上列号和长度。</p>
+<aside name="location">
+<p>有些词法单元的实现把位置存成两个数：一个是从源文件开头到词素开头的偏移量，
+另一个是词素的长度。扫描器反正也得知道这些，所以算出来不花额外代价。</p>
+<p>偏移量以后可以回头查源文件、数前面有几个换行符，换算成行列位置。听起来很慢，
+确实很慢。但你只需要在<strong>真的要给用户显示行列的时候</strong>才做这件事。大多数词法单元一辈子
+都不会出现在错误消息里。对它们来说，事先花在算位置上的时间越少越好。</p>
+</aside>
+<p>我们把这些数据统统装进一个类里。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Token.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">class</span> <span class="t">Token</span> {
+  <span class="k">final</span> <span class="t">TokenType</span> <span class="i">type</span>;
+  <span class="k">final</span> <span class="t">String</span> <span class="i">lexeme</span>;
+  <span class="k">final</span> <span class="t">Object</span> <span class="i">literal</span>;
+  <span class="k">final</span> <span class="t">int</span> <span class="i">line</span>;<span name="location"> </span>
+
+  <span class="t">Token</span>(<span class="t">TokenType</span> <span class="i">type</span>, <span class="t">String</span> <span class="i">lexeme</span>, <span class="t">Object</span> <span class="i">literal</span>, <span class="t">int</span> <span class="i">line</span>) {
+    <span class="k">this</span>.<span class="i">type</span> = <span class="i">type</span>;
+    <span class="k">this</span>.<span class="i">lexeme</span> = <span class="i">lexeme</span>;
+    <span class="k">this</span>.<span class="i">literal</span> = <span class="i">literal</span>;
+    <span class="k">this</span>.<span class="i">line</span> = <span class="i">line</span>;
+  }
+
+  <span class="k">public</span> <span class="t">String</span> <span class="i">toString</span>() {
+    <span class="k">return</span> <span class="i">type</span> + <span class="s">&quot; &quot;</span> + <span class="i">lexeme</span> + <span class="s">&quot; &quot;</span> + <span class="i">literal</span>;
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Token.java</em>, 新建文件</div>
+
+<p>现在我们有了一个结构足够完整、对解释器后续所有阶段都有用的对象。</p>
+<h2><a href="#正则语言与正则表达式" id="正则语言与正则表达式"><small>4&#8202;.&#8202;3</small>正则语言与正则表达式</a></h2>
+<p>既然已经知道要产出什么，那就……产出吧。扫描器的核心是一个循环。从源码的第一个字符开始，
+扫描器弄清楚这个字符属于哪个词素，然后吃掉它，以及跟在后面、属于同一个词素的那些字符。
+到这个词素末尾，它就吐出一个词法单元。</p>
+<p>然后它回到开头再干一遍，从源码里下一个字符重新开始。它就这么一直吃下去，偶尔，呃，
+拉出一些词法单元，直到读完整个输入。</p>
+<p><span name="alligator"></span></p><img src="image/scanning/lexigator.png" alt="一条鳄鱼在吞字符，以及，嗯，后面那部分你就别知道了。" />
+<aside name="alligator">
+<p>词法分析鳄。</p>
+</aside>
+<p>循环里那段「看一眼几个字符，判断它是哪种词素『匹配上了』」的部分，听起来可能有点熟。
+如果你懂正则表达式，你可能会想：给每种词素都定义一条正则，用它们来匹配字符。比如
+Lox 对标识符（变量名之类）的规则跟 C 一样。下面这条正则就能匹配一个：</p>
+<div class="codehilite"><pre>[a-zA-Z_][a-zA-Z_0-9]*
+</pre></div>
+<p>你要是真想到用正则表达式去认这些词素，说明你的直觉相当敏锐。决定一门语言如何把
+字符归组成词素的那套规则，叫做它的<span name="theory"><strong>词法文法</strong></span>。在 Lox 里，和大多数编程语言一样，
+这套文法的规则简单到足以把这门语言的词法文法归入**<a href="https://en.wikipedia.org/wiki/Regular_language">正则语言</a>**。这里那个「正则」
+和正则表达式里的「正则」是同一个意思。</p>
+<aside name="theory">
+<p>我很难过要这么一带而过这套理论，尤其在我觉得 <a href="https://en.wikipedia.org/wiki/Chomsky_hierarchy">乔姆斯基层级</a> 和
+<a href="https://en.wikipedia.org/wiki/Finite-state_machine">有限状态机</a> 都那么有意思的时候。但老实说，别的书比我讲得好。
+<a href="https://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools"><strong>编译原理：原理、技术与工具</strong></a>（人称「龙书」）是这方面的权威参考。</p>
+</aside>
+<p>你<strong>完全</strong>可以用正则精确识别出 Lox 的所有词素，这底下也堆着一大堆有意思的理论，
+解释为什么行、那意味着什么。像 <a href="http://dinosaur.compilertools.net/lex/">Lex</a> 或 <a href="https://github.com/westes/flex">Flex</a> 这类工具就是专门为让你干这事而设计的——
+把一把正则丢给它们，它们就把一个完整的扫描器<span name="lex">还</span>给你。</p>
+<aside name="lex">
+<p>Lex 是迈克·莱斯克和埃里克·施密特做的。对，就是后来当上 Google 执行董事长的那个
+埃里克·施密特。我不是说编程语言是通往财富和名声的必由之路，但<strong>我们中间</strong>至少能数出
+一位亿万富豪。</p>
+</aside>
+<p>既然我们的目标是搞懂扫描器到底怎么做到的，这活儿我们就不外包了——接下来得自己动手。</p>
+<h2><a href="#scanner-类" id="scanner-类"><small>4&#8202;.&#8202;4</small>Scanner 类</a></h2>
+<p>闲话少说，给自己造个扫描器吧。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">import</span> <span class="i">java.util.ArrayList</span>;
+<span class="k">import</span> <span class="i">java.util.HashMap</span>;
+<span class="k">import</span> <span class="i">java.util.List</span>;
+<span class="k">import</span> <span class="i">java.util.Map</span>;
+
+<span class="k">import static</span> <span class="i">com.craftinginterpreters.lox.TokenType.*</span>;<span name="static-import"> </span>
+
+<span class="k">class</span> <span class="t">Scanner</span> {
+  <span class="k">private</span> <span class="k">final</span> <span class="t">String</span> <span class="i">source</span>;
+  <span class="k">private</span> <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Token</span>&gt; <span class="i">tokens</span> = <span class="k">new</span> <span class="t">ArrayList</span>&lt;&gt;();
+
+  <span class="t">Scanner</span>(<span class="t">String</span> <span class="i">source</span>) {
+    <span class="k">this</span>.<span class="i">source</span> = <span class="i">source</span>;
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 新建文件</div>
+
+<aside name="static-import">
+<p>我知道有些人觉得静态导入是坏风格，但它省得我在扫描器和解析器里到处撒
+<code>TokenType.</code>。原谅我吧，书里每一个字符都得算钱。</p>
+</aside>
+<p>我们把原始源码当一个简单的字符串存着，另外准备一个列表，等着往里填我们要生成的
+词法单元。前面说的那个干这事的循环长这样：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>Scanner</em>() 之后</div>
+<pre>  <span class="t">List</span>&lt;<span class="t">Token</span>&gt; <span class="i">scanTokens</span>() {
+    <span class="k">while</span> (!<span class="i">isAtEnd</span>()) {
+<span class="c">// 现在位于下一个词素的开头。</span>
+      <span class="i">start</span> = <span class="i">current</span>;
+      <span class="i">scanToken</span>();
+    }
+
+    <span class="i">tokens</span>.<span class="i">add</span>(<span class="k">new</span> <span class="t">Token</span>(<span class="i">EOF</span>, <span class="s">&quot;&quot;</span>, <span class="k">null</span>, <span class="i">line</span>));
+    <span class="k">return</span> <span class="i">tokens</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>Scanner</em>() 之后</div>
+
+<p>扫描器在源码里一路推进，不停地添词法单元，直到字符用完。然后它追加最后一个「文件结束」
+词法单元。这严格来说不是必需的，但它能让我们的解析器干净一点点。</p>
+<p>这个循环依赖几个字段来记录扫描器在源码里的位置。</p>
+<div class="codehilite"><pre class="insert-before">  private final List&lt;Token&gt; tokens = new ArrayList&lt;&gt;();
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在类 <em>Scanner</em> 内</div>
+<pre class="insert">  <span class="k">private</span> <span class="t">int</span> <span class="i">start</span> = <span class="n">0</span>;
+  <span class="k">private</span> <span class="t">int</span> <span class="i">current</span> = <span class="n">0</span>;
+  <span class="k">private</span> <span class="t">int</span> <span class="i">line</span> = <span class="n">1</span>;
+</pre><pre class="insert-after">
+
+  Scanner(String source) {
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在类 <em>Scanner</em> 内</div>
+
+<p><code>start</code> 和 <code>current</code> 字段是索引进那个字符串的偏移量。<code>start</code> 指向正在扫描的词素的
+第一个字符，<code>current</code> 指向当前正在考虑的那个字符。<code>line</code> 字段记录 <code>current</code> 处在源码的
+第几行，好让我们能产出知道自己位置的词法单元。</p>
+<p>然后我们有一个小帮手函数，告诉我们字符是不是已经吃完了。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>scanTokens</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">boolean</span> <span class="i">isAtEnd</span>() {
+    <span class="k">return</span> <span class="i">current</span> &gt;= <span class="i">source</span>.<span class="i">length</span>();
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>scanTokens</em>() 之后</div>
+
+<h2><a href="#认出词素" id="认出词素"><small>4&#8202;.&#8202;5</small>认出词素</a></h2>
+<p>循环的每一轮，我们扫描一个词法单元。这才是扫描器真正的心脏。我们从简单的开始。
+想象一下要是每个词素都只有一个字符长。那你要做的就只是吃掉下一个字符，再给它挑个
+词法单元类型。Lox 里确实有几个词素<strong>就是</strong>单字符的，那就从它们开始。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>scanTokens</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">void</span> <span class="i">scanToken</span>() {
+    <span class="t">char</span> <span class="i">c</span> = <span class="i">advance</span>();
+    <span class="k">switch</span> (<span class="i">c</span>) {
+      <span class="k">case</span> <span class="s">&#39;(&#39;</span>: <span class="i">addToken</span>(<span class="i">LEFT_PAREN</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;)&#39;</span>: <span class="i">addToken</span>(<span class="i">RIGHT_PAREN</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;{&#39;</span>: <span class="i">addToken</span>(<span class="i">LEFT_BRACE</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;}&#39;</span>: <span class="i">addToken</span>(<span class="i">RIGHT_BRACE</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;,&#39;</span>: <span class="i">addToken</span>(<span class="i">COMMA</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;.&#39;</span>: <span class="i">addToken</span>(<span class="i">DOT</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;-&#39;</span>: <span class="i">addToken</span>(<span class="i">MINUS</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;+&#39;</span>: <span class="i">addToken</span>(<span class="i">PLUS</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;;&#39;</span>: <span class="i">addToken</span>(<span class="i">SEMICOLON</span>); <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;*&#39;</span>: <span class="i">addToken</span>(<span class="i">STAR</span>); <span class="k">break</span>;<span name="slash"> </span>
+    }
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>scanTokens</em>() 之后</div>
+
+<aside name="slash">
+<p>纳闷 <code>/</code> 怎么不在这儿？别急，我们待会儿就讲它。</p>
+</aside>
+<p>我们又需要几个帮手方法。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>isAtEnd</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">char</span> <span class="i">advance</span>() {
+    <span class="k">return</span> <span class="i">source</span>.<span class="i">charAt</span>(<span class="i">current</span>++);
+  }
+
+  <span class="k">private</span> <span class="t">void</span> <span class="i">addToken</span>(<span class="t">TokenType</span> <span class="i">type</span>) {
+    <span class="i">addToken</span>(<span class="i">type</span>, <span class="k">null</span>);
+  }
+
+  <span class="k">private</span> <span class="t">void</span> <span class="i">addToken</span>(<span class="t">TokenType</span> <span class="i">type</span>, <span class="t">Object</span> <span class="i">literal</span>) {
+    <span class="t">String</span> <span class="i">text</span> = <span class="i">source</span>.<span class="i">substring</span>(<span class="i">start</span>, <span class="i">current</span>);
+    <span class="i">tokens</span>.<span class="i">add</span>(<span class="k">new</span> <span class="t">Token</span>(<span class="i">type</span>, <span class="i">text</span>, <span class="i">literal</span>, <span class="i">line</span>));
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>isAtEnd</em>() 之后</div>
+
+<p><code>advance()</code> 方法吃掉源码里的下一个字符并返回它。<code>advance()</code> 管输入，
+<code>addToken()</code> 管输出。它抓下当前词素的文本，给它造一个新词法单元。很快我们会用上
+另一个重载版本，来处理带字面量值的词法单元。</p>
+<h3><a href="#词法错误" id="词法错误"><small>4&#8202;.&#8202;5&#8202;.&#8202;1</small>词法错误</a></h3>
+<p>在走太远之前，先花点时间想想词法层面的错误。要是用户丢给我们一个源文件，里面有些
+Lox 用不到的字符，比如 <code>@#^</code>，会怎么样？眼下这些字符会被悄悄丢掉。Lox 这门语言
+不用它们，但这不代表解释器可以当它们不存在。于是我们报个错。</p>
+<div class="codehilite"><pre class="insert-before">      case '*': addToken(STAR); break;<span name="slash"> </span>
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内</div>
+<pre class="insert">
+
+      <span class="k">default</span>:
+        <span class="t">Lox</span>.<span class="i">error</span>(<span class="i">line</span>, <span class="s">&quot;Unexpected character.&quot;</span>);
+        <span class="k">break</span>;
+</pre><pre class="insert-after">    }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内</div>
+
+<p>注意那个出错的字符仍然被前面那次 <code>advance()</code> 调用<strong>吃掉了</strong>。这很重要，不然我们会被
+困在死循环里。</p>
+<p>还要注意，我们<span name="shotgun"><strong>继续扫描</strong></span>。程序后面可能还有别的错。尽可能一次性把那些错都发现出来，
+能给用户更好的体验。否则他们就会看到一个不起眼的小错，把它修掉，然后下一个错才冒出来，
+如此反复。语法错误打地鼠，一点都不好玩。</p>
+<p>（别担心。因为 <code>hadError</code> 被设上了，我们绝不会去<strong>执行</strong>任何代码，哪怕扫描还会继续
+把剩下的扫完。）</p>
+<aside name="shotgun">
+<p>这段代码每个非法字符都单独报一次，所以万一用户不小心粘进来一大坨怪文本，
+等于一把霰弹枪把他轰个满脸。把连续的一段非法字符合并成一个错误，体验会更好。</p>
+</aside>
+<h3><a href="#运算符" id="运算符"><small>4&#8202;.&#8202;5&#8202;.&#8202;2</small>运算符</a></h3>
+<p>单字符词素已经能跑了，但这还没覆盖 Lox 的全部运算符。那 <code>!</code> 呢？它就一个字符，对吧？
+有时候是，但要是紧接着下一个字符是等号，那我们就该造一个 <code>!=</code> 词素了。注意 <code>!</code> 和
+<code>=</code> <strong>不是</strong>两个独立的运算符。你不能在 Lox 里写 <code>!   =</code> 然后指望它表现得像不等运算符。
+这就是为什么我们得把 <code>!=</code> 当成一个词素来扫。同理，<code>&lt;</code>、<code>&gt;</code> 和 <code>=</code> 后面都能跟个 <code>=</code>，
+组成另外那些相等和比较运算符。</p>
+<p>这些全都需要看第二个字符。</p>
+<div class="codehilite"><pre class="insert-before">      case '*': addToken(STAR); break;<span name="slash"> </span>
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="s">&#39;!&#39;</span>:
+        <span class="i">addToken</span>(<span class="i">match</span>(<span class="s">&#39;=&#39;</span>) ? <span class="i">BANG_EQUAL</span> : <span class="i">BANG</span>);
+        <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;=&#39;</span>:
+        <span class="i">addToken</span>(<span class="i">match</span>(<span class="s">&#39;=&#39;</span>) ? <span class="i">EQUAL_EQUAL</span> : <span class="i">EQUAL</span>);
+        <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;&lt;&#39;</span>:
+        <span class="i">addToken</span>(<span class="i">match</span>(<span class="s">&#39;=&#39;</span>) ? <span class="i">LESS_EQUAL</span> : <span class="i">LESS</span>);
+        <span class="k">break</span>;
+      <span class="k">case</span> <span class="s">&#39;&gt;&#39;</span>:
+        <span class="i">addToken</span>(<span class="i">match</span>(<span class="s">&#39;=&#39;</span>) ? <span class="i">GREATER_EQUAL</span> : <span class="i">GREATER</span>);
+        <span class="k">break</span>;
+</pre><pre class="insert-after">
+
+      default:
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内</div>
+
+<p>那些情况用的是这个新方法：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>scanToken</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">boolean</span> <span class="i">match</span>(<span class="t">char</span> <span class="i">expected</span>) {
+    <span class="k">if</span> (<span class="i">isAtEnd</span>()) <span class="k">return</span> <span class="k">false</span>;
+    <span class="k">if</span> (<span class="i">source</span>.<span class="i">charAt</span>(<span class="i">current</span>) != <span class="i">expected</span>) <span class="k">return</span> <span class="k">false</span>;
+
+    <span class="i">current</span>++;
+    <span class="k">return</span> <span class="k">true</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>scanToken</em>() 之后</div>
+
+<p>它就像一个带条件的 <code>advance()</code>。只有当前字符正是我们要找的那个，我们才吃掉它。</p>
+<p>用上 <code>match()</code>，我们分两个阶段来认词素。比如我们走到 <code>!</code>，就跳到它对应的 switch 分支。
+这意味着我们知道词素<strong>开头</strong>是 <code>!</code>。然后再看下一个字符，判断我们面对的是 <code>!=</code> 还是
+光秃秃一个 <code>!</code>。</p>
+<h2><a href="#更长的词素" id="更长的词素"><small>4&#8202;.&#8202;6</small>更长的词素</a></h2>
+<p>我们还缺一个运算符：做除法的 <code>/</code>。这个字符需要一点特殊处理，因为注释也是用斜杠开头的。</p>
+<div class="codehilite"><pre class="insert-before">        break;
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内</div>
+<pre class="insert">      <span class="k">case</span> <span class="s">&#39;/&#39;</span>:
+        <span class="k">if</span> (<span class="i">match</span>(<span class="s">&#39;/&#39;</span>)) {
+<span class="c">// 注释一直延伸到行尾。</span>
+          <span class="k">while</span> (<span class="i">peek</span>() != <span class="s">&#39;\n&#39;</span> &amp;&amp; !<span class="i">isAtEnd</span>()) <span class="i">advance</span>();
+        } <span class="k">else</span> {
+          <span class="i">addToken</span>(<span class="i">SLASH</span>);
+        }
+        <span class="k">break</span>;
+</pre><pre class="insert-after">
+
+      default:
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内</div>
+
+<p>这跟别的双字符运算符类似，只不过当我们找到第二个 <code>/</code> 时，我们不就此结束这个词素。
+我们继续吃字符，一直吃到行尾为止。</p>
+<p>这就是我们处理更长词素的总策略：一旦认出开头，就转到某个词素专属的代码上去，
+让它一直吃到结尾。</p>
+<p>我们还有一个帮手：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>match</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">char</span> <span class="i">peek</span>() {
+    <span class="k">if</span> (<span class="i">isAtEnd</span>()) <span class="k">return</span> <span class="s">&#39;\0&#39;</span>;
+    <span class="k">return</span> <span class="i">source</span>.<span class="i">charAt</span>(<span class="i">current</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>match</em>() 之后</div>
+
+<p>它有点像 <code>advance()</code>，但不吃掉字符。这叫<span name="match"><strong>前瞻</strong></span>。因为它只看当前那个还没被吃掉的字符，
+所以我们的前瞻量是<strong>一个字符</strong>。一般来说这个数越小，扫描器跑得越快。词法文法的规则
+决定了我们需要多少前瞻。幸好，现实中大多数语言只往前看一两个字符。</p>
+<aside name="match">
+<p>严格说来，<code>match()</code> 也在做前瞻。<code>advance()</code> 和 <code>peek()</code> 是两个基本算子，<code>match()</code> 是
+把它们组合了起来。</p>
+</aside>
+<p>注释也是词素，但它没有意义，解析器也不想跟它打交道。所以当我们走到注释末尾时，
+我们<strong>不</strong>调 <code>addToken()</code>。等我们循环回去开始下一个词素，<code>start</code> 被重置，
+这条注释的词素就一缕青烟般消失了。</p>
+<p>既然说到这儿了，现在也正好把那些同样没意义的字符跳过去：换行和空白。</p>
+<div class="codehilite"><pre class="insert-before">        break;
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内</div>
+<pre class="insert">
+
+      <span class="k">case</span> <span class="s">&#39; &#39;</span>:
+      <span class="k">case</span> <span class="s">&#39;\r&#39;</span>:
+      <span class="k">case</span> <span class="s">&#39;\t&#39;</span>:
+<span class="c">// 跳过空白。</span>
+        <span class="k">break</span>;
+
+      <span class="k">case</span> <span class="s">&#39;\n&#39;</span>:
+        <span class="i">line</span>++;
+        <span class="k">break</span>;
+</pre><pre class="insert-after">
+
+      default:
+        Lox.error(line, &quot;Unexpected character.&quot;);
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内</div>
+
+<p>碰到空白，我们就直接退回扫描循环的开头。这会在那个空白字符<strong>之后</strong>开始一个新词素。
+换行也是这么处理，只不过我们还要把行号加一。（这就是为什么我们用 <code>peek()</code> 而不是
+<code>match()</code> 去找注释末尾的换行——我们要的就是那个换行把我们送到这儿来，好更新 <code>line</code>。）</p>
+<p>我们的扫描器越来越聪明了。它现在能对付相当自由的代码，比如：</p>
+<div class="codehilite"><pre><span class="c">// this is a comment</span>
+(( )){} <span class="c">// grouping stuff</span>
+!*+-/=&lt;&gt; &lt;= == <span class="c">// operators</span>
+</pre></div>
+<h3><a href="#字符串字面量" id="字符串字面量"><small>4&#8202;.&#8202;6&#8202;.&#8202;1</small>字符串字面量</a></h3>
+<p>既然长词素已经顺手了，我们就准备收拾字面量了。先做字符串，因为它们总是以某个特定字符
+开头，就是 <code>"</code>。</p>
+<div class="codehilite"><pre class="insert-before">        break;
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内</div>
+<pre class="insert">
+
+      <span class="k">case</span> <span class="s">&#39;&quot;&#39;</span>: <span class="i">string</span>(); <span class="k">break</span>;
+</pre><pre class="insert-after">
+
+      default:
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内</div>
+
+<p>它调用的是：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>scanToken</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">void</span> <span class="i">string</span>() {
+    <span class="k">while</span> (<span class="i">peek</span>() != <span class="s">&#39;&quot;&#39;</span> &amp;&amp; !<span class="i">isAtEnd</span>()) {
+      <span class="k">if</span> (<span class="i">peek</span>() == <span class="s">&#39;\n&#39;</span>) <span class="i">line</span>++;
+      <span class="i">advance</span>();
+    }
+
+    <span class="k">if</span> (<span class="i">isAtEnd</span>()) {
+      <span class="t">Lox</span>.<span class="i">error</span>(<span class="i">line</span>, <span class="s">&quot;Unterminated string.&quot;</span>);
+      <span class="k">return</span>;
+    }
+
+<span class="c">// 收尾的那个引号。</span>
+    <span class="i">advance</span>();
+
+<span class="c">// 去掉两边的引号。</span>
+    <span class="t">String</span> <span class="i">value</span> = <span class="i">source</span>.<span class="i">substring</span>(<span class="i">start</span> + <span class="n">1</span>, <span class="i">current</span> - <span class="n">1</span>);
+    <span class="i">addToken</span>(<span class="i">STRING</span>, <span class="i">value</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>scanToken</em>() 之后</div>
+
+<p>跟注释一样，我们一直吃字符，直到撞上结束字符串的那个 <code>"</code>。我们也体面地处理了
+字符串还没闭合输入就完了的情况，并为此报个错。</p>
+<p>不知为什么，Lox 支持多行字符串。这有好处也有坏处，但禁掉它比允许它稍微复杂一点，
+所以我就留着了。这确实意味着我们在字符串里撞到换行时，也得更新 <code>line</code>。</p>
+<p>最后一块有意思的地方是：造词法单元的时候，我们还顺带产出之后解释器要用的真正字符串
+<strong>值</strong>。在这儿，这个转换只需要一个 <code>substring()</code> 把两头的引号剥掉。如果 Lox 支持
+<code>\n</code> 这样的转义序列，我们就得在这儿把转义还原。</p>
+<h3><a href="#数字字面量" id="数字字面量"><small>4&#8202;.&#8202;6&#8202;.&#8202;2</small>数字字面量</a></h3>
+<p>Lox 里所有数字在运行时都是浮点数，但整数和小数字面量都支持。一个数字字面量是一串
+<span name="minus">数字</span>，后面可以跟一个 <code>.</code> 加一个或多个尾随数字。</p>
+<aside name="minus">
+<p>由于我们只找一个数字来开头，这就意味着 <code>-123</code> 不是一个数字<strong>字面量</strong>。相反，<code>-123</code>
+是一个<strong>表达式</strong>，它把 <code>-</code> 用在数字字面量 <code>123</code> 上。实践上结果一样，不过如果我们以后
+要给数字加方法调用，就会有一个有意思的边缘情况。想想：</p>
+<div class="codehilite"><pre><span class="k">print</span> -<span class="n">123</span>.<span class="i">abs</span>();
+</pre></div>
+<p>它会打印 <code>-123</code>，因为取负的优先级低于方法调用。我们可以把 <code>-</code> 变成数字字面量的一部分
+来修掉它。但再想想：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">n</span> = <span class="n">123</span>;
+<span class="k">print</span> -<span class="i">n</span>.<span class="i">abs</span>();
+</pre></div>
+<p>这照样产出 <code>-123</code>，于是这门语言看起来就不一致了。你怎么折腾，总有个情况会变得莫名其妙。</p>
+</aside>
+<div class="codehilite"><pre><span class="n">1234</span>
+<span class="n">12.34</span>
+</pre></div>
+<p>我们不允许前导或尾随小数点，所以这两种都是非法的：</p>
+<div class="codehilite"><pre>.<span class="n">1234</span>
+<span class="n">1234</span>.
+</pre></div>
+<p>前一种要支持并不难，但我为了简单没做。后一种一旦我们想允许像 <code>123.sqrt()</code> 这样的
+数字方法就会变得很怪。</p>
+<p>要认出数字词素的开头，我们找任意一个数字就行。给十个十进制数字一个个加 case 有点
+繁琐，所以我们干脆塞进 default 分支。</p>
+<div class="codehilite"><pre class="insert-before">      default:
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">        <span class="k">if</span> (<span class="i">isDigit</span>(<span class="i">c</span>)) {
+          <span class="i">number</span>();
+        } <span class="k">else</span> {
+          <span class="t">Lox</span>.<span class="i">error</span>(<span class="i">line</span>, <span class="s">&quot;Unexpected character.&quot;</span>);
+        }
+</pre><pre class="insert-after">        break;
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内, 替换 1 行</div>
+
+<p>这靠的是这个小工具：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>peek</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">boolean</span> <span class="i">isDigit</span>(<span class="t">char</span> <span class="i">c</span>) {
+    <span class="k">return</span> <span class="i">c</span> &gt;= <span class="s">&#39;0&#39;</span> &amp;&amp; <span class="i">c</span> &lt;= <span class="s">&#39;9&#39;</span>;
+  }<span name="is-digit"> </span>
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>peek</em>() 之后</div>
+
+<aside name="is-digit">
+<p>Java 标准库提供了 <a href="http://docs.oracle.com/javase/7/docs/api/java/lang/Character.html#isDigit(char)"><code>Character.isDigit()</code></a>，看起来挺合适。可惜那个方法
+还认天城文（Devanagari）数字、全角数字之类我们不想要的玩意儿。</p>
+</aside>
+<p>一旦确认我们在数字里，就分支到一个单独的方法去吃字面量的剩余部分，跟处理字符串时一样。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>scanToken</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">void</span> <span class="i">number</span>() {
+    <span class="k">while</span> (<span class="i">isDigit</span>(<span class="i">peek</span>())) <span class="i">advance</span>();
+
+<span class="c">// 找小数部分。</span>
+    <span class="k">if</span> (<span class="i">peek</span>() == <span class="s">&#39;.&#39;</span> &amp;&amp; <span class="i">isDigit</span>(<span class="i">peekNext</span>())) {
+<span class="c">// 吃掉这个「.」。</span>
+      <span class="i">advance</span>();
+
+      <span class="k">while</span> (<span class="i">isDigit</span>(<span class="i">peek</span>())) <span class="i">advance</span>();
+    }
+
+    <span class="i">addToken</span>(<span class="i">NUMBER</span>,
+        <span class="t">Double</span>.<span class="i">parseDouble</span>(<span class="i">source</span>.<span class="i">substring</span>(<span class="i">start</span>, <span class="i">current</span>)));
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>scanToken</em>() 之后</div>
+
+<p>整数部分我们能找到多少数字就吃多少。然后我们找小数部分，也就是一个小数点（<code>.</code>）
+后面跟至少一个数字。要是确实有小数部分，我们还是有多少数字吃多少。</p>
+<p>要越过小数点去看，需要第二个字符的前瞻，因为我们不想在没确定后面还有数字<strong>之前</strong>就
+把那个 <code>.</code> 吃掉。所以我们加上：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>peek</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">char</span> <span class="i">peekNext</span>() {
+    <span class="k">if</span> (<span class="i">current</span> + <span class="n">1</span> &gt;= <span class="i">source</span>.<span class="i">length</span>()) <span class="k">return</span> <span class="s">&#39;\0&#39;</span>;
+    <span class="k">return</span> <span class="i">source</span>.<span class="i">charAt</span>(<span class="i">current</span> + <span class="n">1</span>);
+  }<span name="peek-next"> </span>
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>peek</em>() 之后</div>
+
+<aside name="peek-next">
+<p>我本来可以让 <code>peek()</code> 收一个参数表示往前看几个字符，而不是定义两个函数，但那样就允许
+<strong>任意远</strong>的前瞻了。提供这两个函数，能让读代码的人一眼看出我们的扫描器最多往前看两个
+字符。</p>
+</aside>
+<p>最后，我们把词素转换成它的数值。我们的解释器用 Java 的 <code>Double</code> 类型表示数字，
+所以我们产出这个类型的值。我们用 Java 自带的解析方法把这个词素转成真正的 Java double。
+我们自己也能实现，但说实话，除非你是在为即将到来的编程面试临时抱佛脚，不然这不值得
+你花时间。</p>
+<p>剩下的字面量是布尔值和 <code>nil</code>，但我们把它们当关键字处理，这就引出了……</p>
+<h2><a href="#保留字与标识符" id="保留字与标识符"><small>4&#8202;.&#8202;7</small>保留字与标识符</a></h2>
+<p>我们的扫描器快完工了。词法文法里剩下要实现的，就只有标识符和它的近亲——保留字。
+你可能会想，我们可以用处理 <code>&lt;=</code> 这种多字符运算符的同样办法去匹配 <code>or</code> 这样的关键字。</p>
+<div class="codehilite"><pre><span class="k">case</span> <span class="s">&#39;o&#39;</span>:
+  <span class="k">if</span> (<span class="i">match</span>(<span class="s">&#39;r&#39;</span>)) {
+    <span class="i">addToken</span>(<span class="i">OR</span>);
+  }
+  <span class="k">break</span>;
+</pre></div>
+<p>想想如果用户把一个变量命名为 <code>orchid</code> 会怎样。扫描器会看到头两个字母 <code>or</code>，
+立刻吐出一个 <code>or</code> 关键字词法单元。这就引出了一条重要的原则，叫<span name="maximal"><strong>最长匹配</strong></span>。
+当词法文法的两条规则都能匹配扫描器正在看的这段代码时，<strong>谁匹配的字符多谁赢</strong>。</p>
+<p>这条规则的意思是，如果我们能把 <code>orchid</code> 匹配成标识符、把 <code>or</code> 匹配成关键字，
+那前者赢。这也是为什么我们之前默认把 <code>&lt;=</code> 扫成一个完整的 <code>&lt;=</code> 词法单元，
+而不是一个 <code>&lt;</code> 后跟一个 <code>=</code>。</p>
+<aside name="maximal">
+<p>看看这段难缠的 C 代码：</p>
+<div class="codehilite"><pre>---<span class="i">a</span>;
+</pre></div>
+<p>它合法吗？这取决于扫描器怎么切词素。万一扫描器是这么看的：</p>
+<div class="codehilite"><pre>- --<span class="i">a</span>;
+</pre></div>
+<p>那就能解析了。但那会要求扫描器知道周边代码的语法结构，把事情搅得比我们想要的更乱。
+所以最长匹配规则说，它<strong>总是</strong>会被扫成：</p>
+<div class="codehilite"><pre>-- -<span class="i">a</span>;
+</pre></div>
+<p>哪怕这么扫会导致后面在解析器里出现语法错误，它也照样这么扫。</p>
+</aside>
+<p>最长匹配意味着，在走到「这可能其实是保留字」的边界之前，我们没法轻易判断出关键字。
+毕竟保留字<strong>就是</strong>标识符，只不过被语言征用来自用了。「<strong>保留字</strong>」这个词就是这么来的。</p>
+<p>于是我们先假设，任何以字母或下划线开头的词素都是标识符。</p>
+<div class="codehilite"><pre class="insert-before">      default:
+        if (isDigit(c)) {
+          number();
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>scanToken</em>() 内</div>
+<pre class="insert">        } <span class="k">else</span> <span class="k">if</span> (<span class="i">isAlpha</span>(<span class="i">c</span>)) {
+          <span class="i">identifier</span>();
+</pre><pre class="insert-after">        } else {
+          Lox.error(line, &quot;Unexpected character.&quot;);
+        }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>scanToken</em>() 内</div>
+
+<p>剩下的代码在这边：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>scanToken</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">void</span> <span class="i">identifier</span>() {
+    <span class="k">while</span> (<span class="i">isAlphaNumeric</span>(<span class="i">peek</span>())) <span class="i">advance</span>();
+
+    <span class="i">addToken</span>(<span class="i">IDENTIFIER</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>scanToken</em>() 之后</div>
+
+<p>我们用这几个帮手来定义它：</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+加在 <em>peekNext</em>() 之后</div>
+<pre>  <span class="k">private</span> <span class="t">boolean</span> <span class="i">isAlpha</span>(<span class="t">char</span> <span class="i">c</span>) {
+    <span class="k">return</span> (<span class="i">c</span> &gt;= <span class="s">&#39;a&#39;</span> &amp;&amp; <span class="i">c</span> &lt;= <span class="s">&#39;z&#39;</span>) ||
+           (<span class="i">c</span> &gt;= <span class="s">&#39;A&#39;</span> &amp;&amp; <span class="i">c</span> &lt;= <span class="s">&#39;Z&#39;</span>) ||
+            <span class="i">c</span> == <span class="s">&#39;_&#39;</span>;
+  }
+
+  <span class="k">private</span> <span class="t">boolean</span> <span class="i">isAlphaNumeric</span>(<span class="t">char</span> <span class="i">c</span>) {
+    <span class="k">return</span> <span class="i">isAlpha</span>(<span class="i">c</span>) || <span class="i">isDigit</span>(<span class="i">c</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 加在 <em>peekNext</em>() 之后</div>
+
+<p>这样标识符就通了。至于关键字，我们去看这个标识符的词素是不是某个保留字。如果是，
+就用那个关键字专属的词法单元类型。我们用一个 map 来定义保留字的集合。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在类 <em>Scanner</em> 内</div>
+<pre>  <span class="k">private</span> <span class="k">static</span> <span class="k">final</span> <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">TokenType</span>&gt; <span class="i">keywords</span>;
+
+  <span class="k">static</span> {
+    <span class="i">keywords</span> = <span class="k">new</span> <span class="t">HashMap</span>&lt;&gt;();
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;and&quot;</span>,    <span class="i">AND</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;class&quot;</span>,  <span class="i">CLASS</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;else&quot;</span>,   <span class="i">ELSE</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;false&quot;</span>,  <span class="i">FALSE</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;for&quot;</span>,    <span class="i">FOR</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;fun&quot;</span>,    <span class="i">FUN</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;if&quot;</span>,     <span class="i">IF</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;nil&quot;</span>,    <span class="i">NIL</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;or&quot;</span>,     <span class="i">OR</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;print&quot;</span>,  <span class="i">PRINT</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;return&quot;</span>, <span class="i">RETURN</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;super&quot;</span>,  <span class="i">SUPER</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;this&quot;</span>,   <span class="i">THIS</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;true&quot;</span>,   <span class="i">TRUE</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;var&quot;</span>,    <span class="i">VAR</span>);
+    <span class="i">keywords</span>.<span class="i">put</span>(<span class="s">&quot;while&quot;</span>,  <span class="i">WHILE</span>);
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在类 <em>Scanner</em> 内</div>
+
+<p>扫完一个标识符之后，我们再检查它有没有匹配上 map 里的东西。</p>
+<div class="codehilite"><pre class="insert-before">    while (isAlphaNumeric(peek())) advance();
+
+</pre><div class="source-file"><em>com\craftinginterpreters\lox\Scanner.java</em><br>
+在 <em>identifier</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">    <span class="t">String</span> <span class="i">text</span> = <span class="i">source</span>.<span class="i">substring</span>(<span class="i">start</span>, <span class="i">current</span>);
+    <span class="t">TokenType</span> <span class="i">type</span> = <span class="i">keywords</span>.<span class="i">get</span>(<span class="i">text</span>);
+    <span class="k">if</span> (<span class="i">type</span> == <span class="k">null</span>) <span class="i">type</span> = <span class="i">IDENTIFIER</span>;
+    <span class="i">addToken</span>(<span class="i">type</span>);
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Scanner.java</em>, 在 <em>identifier</em>() 内, 替换 1 行</div>
+
+<p>如果匹配上了，就用那个关键字的词法单元类型。否则，它就是个普普通通的用户自定义标识符。</p>
+<p>至此，我们就有了覆盖整个 Lox 词法文法的完整扫描器。启动 REPL，敲点合法的和非法的代码进去。
+它吐出的词法单元是你预期的吗？尽量想出一些有意思的边缘情况，看看它有没有照规矩处理。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>Python 和 Haskell 的词法文法都<strong>不是</strong>正则的。这是什么意思，为什么它们不是？</p>
+</li>
+<li>
+<p>除了分隔词法单元——区分 <code>print foo</code> 和 <code>printfoo</code>——之外，在大多数语言里
+空格没什么用。但在一两个阴暗角落里，空格<strong>确实</strong>会影响代码怎么解析，比如
+CoffeeScript、Ruby 和 C 预处理器。在这些语言里，空格在哪儿、产生什么影响？</p>
+</li>
+<li>
+<p>我们这个扫描器，和大多数一样，把注释和空白丢掉了，因为解析器用不着它们。
+为什么你可能会想写一个<strong>不</strong>丢弃它们的扫描器？那能拿来做什么？</p>
+</li>
+<li>
+<p>给 Lox 的扫描器加上对 C 风格 <code>/* ... */</code> 块注释的支持。记得处理其中的换行。
+考虑让它们可以嵌套。加嵌套支持比你预期的更费劲吗？为什么？</p>
+</li>
+</ol>
+</div>
+<div class="design-note">
+<h2><a href="#design-note" id="design-note">设计说明：隐式分号</a></h2>
+<p>今天程序员在语言的选择上被宠坏了，对语法也变得挑剔起来。他们希望自己的语言看起来
+干净、现代。几乎每门新语言都会刮掉的一层语法地衣（有些古老语言比如 BASIC
+从来没有过），就是拿 <code>;</code> 当显式的语句终止符。</p>
+<p>取而代之的是，他们在说得过去的地方，就把换行当作语句终止符。「说得过去」这部分才是
+难点。虽然<strong>大多数</strong>语句都单独占一行，但有时候你需要把一条语句摊到好几行上。
+这些混在中间的换行就不该被当成终止符。</p>
+<p>换行该被忽略的那些显而易见的情况，大多很好检测，但还是有几个难缠的：</p>
+<ul>
+<li>
+<p>换行后跟着返回值：</p>
+<div class="codehilite"><pre><span class="k">if</span> (<span class="i">condition</span>) <span class="k">return</span>
+<span class="s">&quot;value&quot;</span>
+</pre></div>
+<p>&ldquo;value&rdquo; 是被返回的值，还是说这是一条没有值的 <code>return</code> 语句，外加一条含字符串字面量的
+  表达式语句？</p>
+</li>
+<li>
+<p>换行后跟着一个带括号的表达式：</p>
+<div class="codehilite"><pre><span class="i">func</span>
+(<span class="i">parenthesized</span>)
+</pre></div>
+<p>这是对 <code>func(parenthesized)</code> 的调用，还是两条表达式语句，一条是 <code>func</code>，另一条是
+  带括号的表达式？</p>
+</li>
+<li>
+<p>换行后跟着一个 <code>-</code>：</p>
+<div class="codehilite"><pre><span class="i">first</span>
+-<span class="i">second</span>
+</pre></div>
+<p>这是 <code>first - second</code>（一个中缀减法），还是两条表达式语句，一条是 <code>first</code>，
+  另一条是对 <code>second</code> 取负？</p>
+</li>
+</ul>
+<p>在这些例子里，把换行当分隔符或不当分隔符都能产出合法代码，但可能不是用户想要的那段代码。
+各个语言用来决定哪些换行算分隔符的规则，简直多得让人不安。举几个：</p>
+<ul>
+<li>
+<p><a href="https://www.lua.org/pil/1.1.html">Lua</a> 完全忽略换行，但它小心地设计语法，使得多数情况下根本不需要语句之间的分隔符。
+这是完全正当的：</p>
+<div class="codehilite"><pre><span class="i">a</span> = <span class="n">1</span> <span class="i">b</span> = <span class="n">2</span>
+</pre></div>
+<p>Lua 是靠要求 <code>return</code> 语句必须是块里的最后一条语句来躲开 <code>return</code> 问题的。如果在
+<code>return</code> 之后、关键字 <code>end</code> 之前还有值，那这个值<strong>必须</strong>是给 <code>return</code> 的。至于另外
+两种情况，它们允许显式的 <code>;</code>，并期待用户真的去用。实践中这几乎从不发生，因为没人
+会写一条带括号或取负的表达式语句。</p>
+</li>
+<li>
+<p><a href="https://golang.org/ref/spec#Semicolons">Go</a> 在扫描器里处理换行。如果换行出现在某几种已知可能结束语句的词法单元类型
+之后，这个换行就被当成分号；否则就忽略。Go 团队提供了一个规范的代码格式化工具
+<a href="https://golang.org/cmd/gofmt/">gofmt</a>，而且生态圈对它的使用相当狂热，这就保证了惯用风格的代码能很好地配合
+这条简单规则。</p>
+</li>
+<li>
+<p><a href="https://docs.python.org/3.5/reference/lexical_analysis.html#implicit-line-joining">Python</a> 把所有换行都当作有意义的，除非在行尾用反斜杠显式续行。不过，只要还
+处在某对括号（<code>()</code>、<code>[]</code> 或 <code>{}</code>）里面，任何位置的换行都会被忽略。惯用风格
+强烈偏好后者。</p>
+<p>这条规则对 Python 之所以有效，是因为它是一门高度面向语句的语言。特别是，
+Python 的文法确保语句绝不会出现在表达式内部。C 也一样，但很多有「lambda」或
+函数字面量语法的语言就不这样了。</p>
+<p>一个 JavaScript 的例子：</p>
+<div class="codehilite"><pre><span class="i">console</span>.<span class="i">log</span>(<span class="k">function</span>() {
+  <span class="i">statement</span>();
+});
+</pre></div>
+<p>这里 <code>console.log()</code> 这个<strong>表达式</strong>里含着一个函数字面量，函数字面量里又含有
+<strong>语句</strong> <code>statement();</code>。</p>
+<p>Python 如果想隐式接续行，就需要另一套规则了——让你在仍嵌套在括号里的情况下，
+能<strong>回到</strong>那些换行该变得有意义的<span name="lambda">语句</span>里去。</p>
+</li>
+</ul>
+<aside name="lambda">
+<p>现在你知道为什么 Python 的 <code>lambda</code> 只允许单个表达式作为函数体了。</p>
+</aside>
+<ul>
+<li>
+<p>JavaScript 的「<a href="https://www.ecma-international.org/ecma-262/5.1/#sec-7.9">自动分号插入</a>」规则才是真正奇怪的那个。别的语言大多假设
+<strong>大多数</strong>换行都是有意义的，只有少数几个在多行语句里该被忽略；JS 假设的正好相反。
+它把你的所有换行都当作无意义的空白，<strong>除非</strong>它撞上解析错误。真撞上了，它就回头
+试着把上一个换行变成分号，好让结果语法合法。</p>
+<p>要是把「这到底<strong>怎么做到的</strong>」连同「JavaScript 这套『方案』有多少种烂法」
+一起细讲，这篇设计说明就得变成一篇设计长文了。那是一团糟。JavaScript 是我唯一
+知道的、很多风格指南要求每条语句后面都写显式分号的语言——哪怕这语言理论上允许
+你省掉它们。</p>
+</li>
+</ul>
+<p>如果你在设计一门新语言，那你几乎肯定<strong>应该</strong>避开显式的语句终止符。程序员跟其他人类
+一样，是追潮流的动物，而分号跟全大写关键字一样，早就过时了。只要确保你挑的那套规则
+适合这门语言自己的文法和惯用法就行。还有，别学 JavaScript。</p>
+</div>
+
+<footer>
+<a href="representing-code.html" class="next">
+  下一章：&ldquo;表示代码&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

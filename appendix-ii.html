@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>附录二：生成的语法树类 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">附录二：生成的语法树类<small>A2</small></a></h3>
+
+<ul>
+    <li><a href="#表达式"><small>A2.1</small> 表达式</a></li>
+    <li><a href="#语句"><small>A2.2</small> 语句</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="appendix-i.html" title="附录一：Lox 语法" class="left">&larr;&nbsp;上一</a>
+    <a href="backmatter.html" title="附录">&uarr;&nbsp;返回</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="appendix-i.html" title="附录一：Lox 语法" class="prev">←</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">附录二：生成的语法树类<small>A2</small></a></h3>
+
+<ul>
+    <li><a href="#表达式"><small>A2.1</small> 表达式</a></li>
+    <li><a href="#语句"><small>A2.2</small> 语句</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="appendix-i.html" title="附录一：Lox 语法" class="left">&larr;&nbsp;上一</a>
+    <a href="backmatter.html" title="附录">&uarr;&nbsp;返回</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">A2</div>
+  <h1>附录二：生成的语法树类</h1>
+
+<p>为了让你长点见识，这里是<a href="representing-code.html#给树做元编程">我们写的那个小脚本</a>产出的代码——那个脚本用来自动生成
+jlox 的语法树类。</p>
+<h2><a href="#表达式" id="表达式"><small>A2&#8202;.&#8202;1</small>表达式</a></h2>
+<p>表达式是我们最先见到的语法树节点，在<a href="representing-code.html">《表示代码》</a>里登场。主要的 Expr
+类定义了访问者接口，用来分派到具体的表达式类型，并把其他表达式子类作为嵌套类装在里面。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">import</span> <span class="i">java.util.List</span>;
+
+<span class="k">abstract</span> <span class="k">class</span> <span class="t">Expr</span> {
+  <span class="k">interface</span> <span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; {
+    <span class="t">R</span> <span class="i">visitAssignExpr</span>(<span class="t">Assign</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitBinaryExpr</span>(<span class="t">Binary</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitCallExpr</span>(<span class="t">Call</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitGetExpr</span>(<span class="t">Get</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitGroupingExpr</span>(<span class="t">Grouping</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitLiteralExpr</span>(<span class="t">Literal</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitLogicalExpr</span>(<span class="t">Logical</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitSetExpr</span>(<span class="t">Set</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitSuperExpr</span>(<span class="t">Super</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitThisExpr</span>(<span class="t">This</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitUnaryExpr</span>(<span class="t">Unary</span> <span class="i">expr</span>);
+    <span class="t">R</span> <span class="i">visitVariableExpr</span>(<span class="t">Variable</span> <span class="i">expr</span>);
+  }
+
+<span class="c">// Expr 的各个嵌套类在这里……</span>
+
+  <span class="k">abstract</span> &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 新建文件</div>
+
+<h3><a href="#赋值表达式" id="赋值表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;1</small>赋值表达式</a></h3>
+<p>变量赋值在<a href="statements-and-state.html#赋值">《语句与状态》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Assign</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Assign</span>(<span class="t">Token</span> <span class="i">name</span>, <span class="t">Expr</span> <span class="i">value</span>) {
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+      <span class="k">this</span>.<span class="i">value</span> = <span class="i">value</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitAssignExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">value</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#二元表达式" id="二元表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;2</small>二元表达式</a></h3>
+<p>二元运算符在<a href="representing-code.html">《表示代码》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Binary</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Binary</span>(<span class="t">Expr</span> <span class="i">left</span>, <span class="t">Token</span> <span class="i">operator</span>, <span class="t">Expr</span> <span class="i">right</span>) {
+      <span class="k">this</span>.<span class="i">left</span> = <span class="i">left</span>;
+      <span class="k">this</span>.<span class="i">operator</span> = <span class="i">operator</span>;
+      <span class="k">this</span>.<span class="i">right</span> = <span class="i">right</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitBinaryExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">left</span>;
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">operator</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">right</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#调用表达式" id="调用表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;3</small>调用表达式</a></h3>
+<p>函数调用表达式在<a href="functions.html#函数调用">《函数》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Call</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Call</span>(<span class="t">Expr</span> <span class="i">callee</span>, <span class="t">Token</span> <span class="i">paren</span>, <span class="t">List</span>&lt;<span class="t">Expr</span>&gt; <span class="i">arguments</span>) {
+      <span class="k">this</span>.<span class="i">callee</span> = <span class="i">callee</span>;
+      <span class="k">this</span>.<span class="i">paren</span> = <span class="i">paren</span>;
+      <span class="k">this</span>.<span class="i">arguments</span> = <span class="i">arguments</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitCallExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">callee</span>;
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">paren</span>;
+    <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Expr</span>&gt; <span class="i">arguments</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#get-表达式" id="get-表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;4</small>Get 表达式</a></h3>
+<p>属性访问，也就是「get」表达式，在<a href="classes.html#实例上的属性">《类》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Get</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Get</span>(<span class="t">Expr</span> <span class="i">object</span>, <span class="t">Token</span> <span class="i">name</span>) {
+      <span class="k">this</span>.<span class="i">object</span> = <span class="i">object</span>;
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitGetExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">object</span>;
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#分组表达式" id="分组表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;5</small>分组表达式</a></h3>
+<p>用括号把表达式分组，在<a href="representing-code.html">《表示代码》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Grouping</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Grouping</span>(<span class="t">Expr</span> <span class="i">expression</span>) {
+      <span class="k">this</span>.<span class="i">expression</span> = <span class="i">expression</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitGroupingExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">expression</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#字面量表达式" id="字面量表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;6</small>字面量表达式</a></h3>
+<p>字面量值表达式在<a href="representing-code.html">《表示代码》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Literal</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Literal</span>(<span class="t">Object</span> <span class="i">value</span>) {
+      <span class="k">this</span>.<span class="i">value</span> = <span class="i">value</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitLiteralExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Object</span> <span class="i">value</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#逻辑表达式" id="逻辑表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;7</small>逻辑表达式</a></h3>
+<p>逻辑运算符 <code>and</code> 和 <code>or</code> 在<a href="control-flow.html#逻辑运算符">《控制流》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Logical</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Logical</span>(<span class="t">Expr</span> <span class="i">left</span>, <span class="t">Token</span> <span class="i">operator</span>, <span class="t">Expr</span> <span class="i">right</span>) {
+      <span class="k">this</span>.<span class="i">left</span> = <span class="i">left</span>;
+      <span class="k">this</span>.<span class="i">operator</span> = <span class="i">operator</span>;
+      <span class="k">this</span>.<span class="i">right</span> = <span class="i">right</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitLogicalExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">left</span>;
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">operator</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">right</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#set-表达式" id="set-表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;8</small>Set 表达式</a></h3>
+<p>属性赋值，也就是「set」表达式，在<a href="classes.html#实例上的属性">《类》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Set</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Set</span>(<span class="t">Expr</span> <span class="i">object</span>, <span class="t">Token</span> <span class="i">name</span>, <span class="t">Expr</span> <span class="i">value</span>) {
+      <span class="k">this</span>.<span class="i">object</span> = <span class="i">object</span>;
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+      <span class="k">this</span>.<span class="i">value</span> = <span class="i">value</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitSetExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">object</span>;
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">value</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#super-表达式" id="super-表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;9</small>Super 表达式</a></h3>
+<p><code>super</code> 表达式在<a href="inheritance.html#调用超类方法">《继承》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Super</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Super</span>(<span class="t">Token</span> <span class="i">keyword</span>, <span class="t">Token</span> <span class="i">method</span>) {
+      <span class="k">this</span>.<span class="i">keyword</span> = <span class="i">keyword</span>;
+      <span class="k">this</span>.<span class="i">method</span> = <span class="i">method</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitSuperExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">keyword</span>;
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">method</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#this-表达式" id="this-表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;10</small>This 表达式</a></h3>
+<p><code>this</code> 表达式在<a href="classes.html#this">《类》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">This</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">This</span>(<span class="t">Token</span> <span class="i">keyword</span>) {
+      <span class="k">this</span>.<span class="i">keyword</span> = <span class="i">keyword</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitThisExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">keyword</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#一元表达式" id="一元表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;11</small>一元表达式</a></h3>
+<p>一元运算符在<a href="representing-code.html">《表示代码》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Unary</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Unary</span>(<span class="t">Token</span> <span class="i">operator</span>, <span class="t">Expr</span> <span class="i">right</span>) {
+      <span class="k">this</span>.<span class="i">operator</span> = <span class="i">operator</span>;
+      <span class="k">this</span>.<span class="i">right</span> = <span class="i">right</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitUnaryExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">operator</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">right</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h3><a href="#变量表达式" id="变量表达式"><small>A2&#8202;.&#8202;1&#8202;.&#8202;12</small>变量表达式</a></h3>
+<p>变量访问表达式在<a href="statements-and-state.html#变量的语法">《语句与状态》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Expr.java</em><br>
+嵌套在类 <em>Expr</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Variable</span> <span class="k">extends</span> <span class="t">Expr</span> {
+    <span class="t">Variable</span>(<span class="t">Token</span> <span class="i">name</span>) {
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitVariableExpr</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Expr.java</em>, 嵌套在类 <em>Expr</em> 里</div>
+
+<h2><a href="#语句" id="语句"><small>A2&#8202;.&#8202;2</small>语句</a></h2>
+<p>语句构成另一套独立的语法树节点层级。我们在<a href="statements-and-state.html">《语句与状态》</a>里加上了
+开头几个。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+新建文件</div>
+<pre><span class="k">package</span> <span class="i">com.craftinginterpreters.lox</span>;
+
+<span class="k">import</span> <span class="i">java.util.List</span>;
+
+<span class="k">abstract</span> <span class="k">class</span> <span class="t">Stmt</span> {
+  <span class="k">interface</span> <span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; {
+    <span class="t">R</span> <span class="i">visitBlockStmt</span>(<span class="t">Block</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitClassStmt</span>(<span class="t">Class</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitExpressionStmt</span>(<span class="t">Expression</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitFunctionStmt</span>(<span class="t">Function</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitIfStmt</span>(<span class="t">If</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitPrintStmt</span>(<span class="t">Print</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitReturnStmt</span>(<span class="t">Return</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitVarStmt</span>(<span class="t">Var</span> <span class="i">stmt</span>);
+    <span class="t">R</span> <span class="i">visitWhileStmt</span>(<span class="t">While</span> <span class="i">stmt</span>);
+  }
+
+<span class="c">// Stmt 的各个嵌套类在这里……</span>
+
+  <span class="k">abstract</span> &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>);
+}
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 新建文件</div>
+
+<h3><a href="#块语句" id="块语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;1</small>块语句</a></h3>
+<p>定义局部作用域的花括号块语句在<a href="statements-and-state.html#块的语法与语义">《语句与状态》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Block</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Block</span>(<span class="t">List</span>&lt;<span class="t">Stmt</span>&gt; <span class="i">statements</span>) {
+      <span class="k">this</span>.<span class="i">statements</span> = <span class="i">statements</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitBlockStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Stmt</span>&gt; <span class="i">statements</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#类语句" id="类语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;2</small>类语句</a></h3>
+<p>类声明在——不出所料——<a href="classes.html#类声明">《类》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Class</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Class</span>(<span class="t">Token</span> <span class="i">name</span>,
+          <span class="t">Expr</span>.<span class="t">Variable</span> <span class="i">superclass</span>,
+          <span class="t">List</span>&lt;<span class="t">Stmt</span>.<span class="t">Function</span>&gt; <span class="i">methods</span>) {
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+      <span class="k">this</span>.<span class="i">superclass</span> = <span class="i">superclass</span>;
+      <span class="k">this</span>.<span class="i">methods</span> = <span class="i">methods</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitClassStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+    <span class="k">final</span> <span class="t">Expr</span>.<span class="t">Variable</span> <span class="i">superclass</span>;
+    <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Stmt</span>.<span class="t">Function</span>&gt; <span class="i">methods</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#表达式语句" id="表达式语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;3</small>表达式语句</a></h3>
+<p>表达式语句在<a href="statements-and-state.html#语句">《语句与状态》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Expression</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Expression</span>(<span class="t">Expr</span> <span class="i">expression</span>) {
+      <span class="k">this</span>.<span class="i">expression</span> = <span class="i">expression</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitExpressionStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">expression</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#函数语句" id="函数语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;4</small>函数语句</a></h3>
+<p>函数声明在——你猜对了——<a href="functions.html#函数声明">《函数》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Function</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Function</span>(<span class="t">Token</span> <span class="i">name</span>, <span class="t">List</span>&lt;<span class="t">Token</span>&gt; <span class="i">params</span>, <span class="t">List</span>&lt;<span class="t">Stmt</span>&gt; <span class="i">body</span>) {
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+      <span class="k">this</span>.<span class="i">params</span> = <span class="i">params</span>;
+      <span class="k">this</span>.<span class="i">body</span> = <span class="i">body</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitFunctionStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+    <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Token</span>&gt; <span class="i">params</span>;
+    <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">Stmt</span>&gt; <span class="i">body</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#if-语句" id="if-语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;5</small>If 语句</a></h3>
+<p><code>if</code> 语句在<a href="control-flow.html#条件执行">《控制流》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">If</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">If</span>(<span class="t">Expr</span> <span class="i">condition</span>, <span class="t">Stmt</span> <span class="i">thenBranch</span>, <span class="t">Stmt</span> <span class="i">elseBranch</span>) {
+      <span class="k">this</span>.<span class="i">condition</span> = <span class="i">condition</span>;
+      <span class="k">this</span>.<span class="i">thenBranch</span> = <span class="i">thenBranch</span>;
+      <span class="k">this</span>.<span class="i">elseBranch</span> = <span class="i">elseBranch</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitIfStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">condition</span>;
+    <span class="k">final</span> <span class="t">Stmt</span> <span class="i">thenBranch</span>;
+    <span class="k">final</span> <span class="t">Stmt</span> <span class="i">elseBranch</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#print-语句" id="print-语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;6</small>Print 语句</a></h3>
+<p><code>print</code> 语句在<a href="statements-and-state.html#语句">《语句与状态》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Print</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Print</span>(<span class="t">Expr</span> <span class="i">expression</span>) {
+      <span class="k">this</span>.<span class="i">expression</span> = <span class="i">expression</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitPrintStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">expression</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#return-语句" id="return-语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;7</small>Return 语句</a></h3>
+<p>你得先有个函数才能从中返回，所以 <code>return</code> 语句在<a href="functions.html#return-语句">《函数》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Return</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Return</span>(<span class="t">Token</span> <span class="i">keyword</span>, <span class="t">Expr</span> <span class="i">value</span>) {
+      <span class="k">this</span>.<span class="i">keyword</span> = <span class="i">keyword</span>;
+      <span class="k">this</span>.<span class="i">value</span> = <span class="i">value</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitReturnStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">keyword</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">value</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#变量语句" id="变量语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;8</small>变量语句</a></h3>
+<p>变量声明在<a href="statements-and-state.html#变量的语法">《语句与状态》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">Var</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">Var</span>(<span class="t">Token</span> <span class="i">name</span>, <span class="t">Expr</span> <span class="i">initializer</span>) {
+      <span class="k">this</span>.<span class="i">name</span> = <span class="i">name</span>;
+      <span class="k">this</span>.<span class="i">initializer</span> = <span class="i">initializer</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitVarStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Token</span> <span class="i">name</span>;
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">initializer</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+<h3><a href="#while-语句" id="while-语句"><small>A2&#8202;.&#8202;2&#8202;.&#8202;9</small>While 语句</a></h3>
+<p><code>while</code> 语句在<a href="control-flow.html#while-循环">《控制流》</a>里登场。</p>
+<div class="codehilite"><div class="source-file"><em>com\craftinginterpreters\lox\Stmt.java</em><br>
+嵌套在类 <em>Stmt</em> 里</div>
+<pre>  <span class="k">static</span> <span class="k">class</span> <span class="t">While</span> <span class="k">extends</span> <span class="t">Stmt</span> {
+    <span class="t">While</span>(<span class="t">Expr</span> <span class="i">condition</span>, <span class="t">Stmt</span> <span class="i">body</span>) {
+      <span class="k">this</span>.<span class="i">condition</span> = <span class="i">condition</span>;
+      <span class="k">this</span>.<span class="i">body</span> = <span class="i">body</span>;
+    }
+
+    <span class="a">@Override</span>
+    &lt;<span class="t">R</span>&gt; <span class="t">R</span> <span class="i">accept</span>(<span class="t">Visitor</span>&lt;<span class="t">R</span>&gt; <span class="i">visitor</span>) {
+      <span class="k">return</span> <span class="i">visitor</span>.<span class="i">visitWhileStmt</span>(<span class="k">this</span>);
+    }
+
+    <span class="k">final</span> <span class="t">Expr</span> <span class="i">condition</span>;
+    <span class="k">final</span> <span class="t">Stmt</span> <span class="i">body</span>;
+  }
+</pre></div>
+<div class="source-file-narrow"><em>com\craftinginterpreters\lox\Stmt.java</em>, 嵌套在类 <em>Stmt</em> 里</div>
+
+
+<footer>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>
