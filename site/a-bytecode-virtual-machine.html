@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>第二部分 字节码虚拟机 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h2><small>III</small>第二部分 字节码虚拟机</h2>
+
+<ul>
+    <li><a href="chunks-of-bytecode.html"><small>14</small>字节码块</a></li>
+    <li><a href="a-virtual-machine.html"><small>15</small>虚拟机</a></li>
+    <li><a href="scanning-on-demand.html"><small>16</small>按需扫描</a></li>
+    <li><a href="compiling-expressions.html"><small>17</small>编译表达式</a></li>
+    <li><a href="types-of-values.html"><small>18</small>值的类型</a></li>
+    <li><a href="strings.html"><small>19</small>字符串</a></li>
+    <li><a href="hash-tables.html"><small>20</small>哈希表</a></li>
+    <li><a href="global-variables.html"><small>21</small>全局变量</a></li>
+    <li><a href="local-variables.html"><small>22</small>局部变量</a></li>
+    <li><a href="jumping-back-and-forth.html"><small>23</small>来回跳转</a></li>
+    <li><a href="calls-and-functions.html"><small>24</small>调用与函数</a></li>
+    <li><a href="closures.html"><small>25</small>闭包</a></li>
+    <li><a href="garbage-collection.html"><small>26</small>垃圾回收</a></li>
+    <li><a href="classes-and-instances.html"><small>27</small>类与实例</a></li>
+    <li><a href="methods-and-initializers.html"><small>28</small>方法与初始化器</a></li>
+    <li><a href="superclasses.html"><small>29</small>超类</a></li>
+    <li><a href="optimization.html"><small>30</small>优化</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="inheritance.html" title="继承" class="left">&larr;&nbsp;上一</a>
+    <a href="contents.html" title="目录">&uarr;&nbsp;返回</a>
+    <a href="chunks-of-bytecode.html" title="字节码块" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="inheritance.html" title="继承" class="prev">←</a>
+<a href="chunks-of-bytecode.html" title="字节码块" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h2><small>III</small>第二部分 字节码虚拟机</h2>
+
+<ul>
+    <li><a href="chunks-of-bytecode.html"><small>14</small>字节码块</a></li>
+    <li><a href="a-virtual-machine.html"><small>15</small>虚拟机</a></li>
+    <li><a href="scanning-on-demand.html"><small>16</small>按需扫描</a></li>
+    <li><a href="compiling-expressions.html"><small>17</small>编译表达式</a></li>
+    <li><a href="types-of-values.html"><small>18</small>值的类型</a></li>
+    <li><a href="strings.html"><small>19</small>字符串</a></li>
+    <li><a href="hash-tables.html"><small>20</small>哈希表</a></li>
+    <li><a href="global-variables.html"><small>21</small>全局变量</a></li>
+    <li><a href="local-variables.html"><small>22</small>局部变量</a></li>
+    <li><a href="jumping-back-and-forth.html"><small>23</small>来回跳转</a></li>
+    <li><a href="calls-and-functions.html"><small>24</small>调用与函数</a></li>
+    <li><a href="closures.html"><small>25</small>闭包</a></li>
+    <li><a href="garbage-collection.html"><small>26</small>垃圾回收</a></li>
+    <li><a href="classes-and-instances.html"><small>27</small>类与实例</a></li>
+    <li><a href="methods-and-initializers.html"><small>28</small>方法与初始化器</a></li>
+    <li><a href="superclasses.html"><small>29</small>超类</a></li>
+    <li><a href="optimization.html"><small>30</small>优化</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="inheritance.html" title="继承" class="left">&larr;&nbsp;上一</a>
+    <a href="contents.html" title="目录">&uarr;&nbsp;返回</a>
+    <a href="chunks-of-bytecode.html" title="字节码块" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">III</div>
+  <h1 class="part">第二部分 字节码虚拟机</h1>
+
+<p>我们的 Java 解释器 jlox，教会了我们编程语言的一大批基础。可要学的东西还有很多。首先，
+只要你在 jlox 里跑几个有点意思的 Lox 程序，就会发现它慢得让人难受。它采用的解释方式——
+直接遍历 AST——对<strong>某些</strong>实际用途来说够用了，但对一门通用的脚本语言而言，就差得远了。</p>
+<p>另外，我们还在一定程度上依赖着 JVM 自身的运行时特性。我们想当然地认为，Java 里的 <code>instanceof</code>
+这类东西<strong>不知怎么就</strong>能用。而且我们从没为内存管理操过一秒钟的心，因为 JVM 的垃圾回收器
+替我们打点好了一切。</p>
+<p>当我们把注意力放在高层概念上时，把这些轻轻带过没问题。可既然我们已经摸清了它的门路，
+就该往下深入到更低的层次，仅凭 C 标准库，从零搭起我们自己的虚拟机……</p>
+
+<footer>
+<a href="chunks-of-bytecode.html" class="next">
+  下一章：&ldquo;字节码块&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

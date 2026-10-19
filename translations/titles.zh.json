@@ -1,0 +1,93 @@
+{
+  "_comment": "章节/部件显示标题。左侧 key 必须与 tool/lib/src/book.dart 中 _tableOfContents 的英文标题完全一致，右侧为中文显示名。改动本文件无需重新编译工具。",
+
+  "pages": {
+    "Crafting Interpreters": "手雕解释器",
+    "Dedication": "献词",
+    "Acknowledgements": "致谢",
+    "Table of Contents": "目录",
+
+    "Welcome": "欢迎",
+    "Introduction": "导言",
+    "A Map of the Territory": "领域地图",
+    "The Lox Language": "Lox 语言",
+
+    "A Tree-Walk Interpreter": "第一部分 树遍历解释器",
+    "Scanning": "扫描",
+    "Representing Code": "表示代码",
+    "Parsing Expressions": "语法解析表达式",
+    "Evaluating Expressions": "求值表达式",
+    "Statements and State": "语句与状态",
+    "Control Flow": "控制流",
+    "Functions": "函数",
+    "Resolving and Binding": "作用域解析与绑定",
+    "Classes": "类",
+    "Inheritance": "继承",
+
+    "A Bytecode Virtual Machine": "第二部分 字节码虚拟机",
+    "Chunks of Bytecode": "字节码块",
+    "A Virtual Machine": "虚拟机",
+    "Scanning on Demand": "按需扫描",
+    "Compiling Expressions": "编译表达式",
+    "Types of Values": "值的类型",
+    "Strings": "字符串",
+    "Hash Tables": "哈希表",
+    "Global Variables": "全局变量",
+    "Local Variables": "局部变量",
+    "Jumping Back and Forth": "来回跳转",
+    "Calls and Functions": "调用与函数",
+    "Closures": "闭包",
+    "Garbage Collection": "垃圾回收",
+    "Classes and Instances": "类与实例",
+    "Methods and Initializers": "方法与初始化器",
+    "Superclasses": "超类",
+    "Optimization": "优化",
+
+    "Backmatter": "附录",
+    "Appendix I": "附录一：Lox 语法",
+    "Appendix II": "附录二：生成的语法树类"
+  },
+
+  "_design_notes": "设计说明的名称。key 为 md 中 `## Design Note:` 之后的原文（不含前缀）。md 未翻译时目录页靠它显示中文；md 翻译后 md 里已是中文，此表自然失效。",
+  "design_notes": {
+    "Register-Based Bytecode": "基于寄存器的字节码",
+    "Test Your Language": "测试你的语言",
+    "Prototypes and Power": "原型与力量",
+    "Closing Over the Loop Variable": "闭包捕获循环变量",
+    "It's Just Parsing": "说到底就是解析",
+    "Spoonfuls of Syntactic Sugar": "一勺勺的语法糖",
+    "Static and Dynamic Typing": "静态类型与动态类型",
+    "Generational Collectors": "分代收集器",
+    "What's in a Name?": "名字里能有什么？",
+    "Considering Goto Harmful": "再想想 goto 有害论",
+    "Novelty Budget": "新意预算",
+    "Logic Versus History": "逻辑 vs 历史",
+    "Implicit Semicolons": "隐式分号",
+    "Implicit Variable Declaration": "隐式变量声明",
+    "String Encoding": "字符串编码",
+    "Expressions and Statements": "表达式与语句"
+  },
+
+  "_ui": "界面固定文案，对应 asset/mustache/*.html 中硬编码的英文。",
+  "ui": {
+    "next": "下一",
+    "previous": "上一",
+    "up": "返回",
+    "chapter": "章",
+    "part": "部分",
+    "first": "首个",
+"challenges": "习题",
+"note": "设计说明",
+"design_note": "设计说明",
+    "table_of_contents": "目录",
+"frontmatter": "前置部分",
+    "handcrafted": "手雕于",
+    "site_title": "手雕解释器"
+  },
+
+  "_design_note": "设计说明前缀。md 中写 '设计说明：xxx' 即视为设计说明，对应原版 'Design Note: xxx'。",
+  "special_headers": {
+    "challenges": ["Challenges", "习题"],
+    "design_note_prefixes": ["Design Note:", "Design Note: ", "设计说明：", "设计说明:"]
+  }
+}

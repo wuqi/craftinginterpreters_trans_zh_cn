@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>垃圾回收 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">垃圾回收<small>26</small></a></h3>
+
+<ul>
+    <li><a href="#可达性"><small>26.1</small> 可达性</a></li>
+    <li><a href="#标记-清除垃圾回收"><small>26.2</small> 标记-清除垃圾回收</a></li>
+    <li><a href="#标记根"><small>26.3</small> 标记根</a></li>
+    <li><a href="#追踪对象引用"><small>26.4</small> 追踪对象引用</a></li>
+    <li><a href="#清除未使用的对象"><small>26.5</small> 清除未使用的对象</a></li>
+    <li><a href="#何时回收"><small>26.6</small> 何时回收</a></li>
+    <li><a href="#垃圾回收的-bug"><small>26.7</small> 垃圾回收的 bug</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>分代回收器</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="closures.html" title="闭包" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="classes-and-instances.html" title="类与实例" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="closures.html" title="闭包" class="prev">←</a>
+<a href="classes-and-instances.html" title="类与实例" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">垃圾回收<small>26</small></a></h3>
+
+<ul>
+    <li><a href="#可达性"><small>26.1</small> 可达性</a></li>
+    <li><a href="#标记-清除垃圾回收"><small>26.2</small> 标记-清除垃圾回收</a></li>
+    <li><a href="#标记根"><small>26.3</small> 标记根</a></li>
+    <li><a href="#追踪对象引用"><small>26.4</small> 追踪对象引用</a></li>
+    <li><a href="#清除未使用的对象"><small>26.5</small> 清除未使用的对象</a></li>
+    <li><a href="#何时回收"><small>26.6</small> 何时回收</a></li>
+    <li><a href="#垃圾回收的-bug"><small>26.7</small> 垃圾回收的 bug</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>分代回收器</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="closures.html" title="闭包" class="left">&larr;&nbsp;上一</a>
+    <a href="a-bytecode-virtual-machine.html" title="第二部分 字节码虚拟机">&uarr;&nbsp;返回</a>
+    <a href="classes-and-instances.html" title="类与实例" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">26</div>
+  <h1>垃圾回收</h1>
+
+<blockquote>
+<p>I wanna, I wanna, I wanna, I wanna, I wanna be trash.</p>
+<p><cite>—— The Whip, “Trash”</cite></p>
+</blockquote>
+<p>【译者注：The Whip 乐队的歌曲，歌词也没必要翻译了】</p>
+<p>我们说 Lox 是门「高层」语言，是因为它把程序员从那些与所解决问题无关的细节里解放出来。
+用户成了一名管理者，给机器下达抽象的目标，让低贱的计算机自己去想办法怎么达成。</p>
+<p>动态内存分配是自动化的绝佳候选。它是程序能跑起来的必要条件，手工去做既乏味又容易出错。
+那些难免会犯的错误可能是灾难性的，导致崩溃、内存损坏或者安全漏洞。这正是那种机器比人
+更擅长的活儿：风险与无聊并存。</p>
+<p>这就是为什么 Lox 是一门<strong>托管语言</strong>——意思是语言实现替用户管理内存的分配与释放。当用户
+执行一个需要动态内存的操作时，VM 自动分配。程序员从不需要操心释放任何东西。机器保证程序
+用到的任何内存都会在需要的时间内一直存在。</p>
+<p>Lox 营造出一种「计算机拥有无限内存」的幻觉。用户可以分配、分配、再分配，一次都不用想这些
+字节是从哪来的。当然，计算机还没有真正<strong>拥有</strong>无限内存。所以托管语言维持这个幻觉的办法，
+就是背着程序员把程序已经不需要的内存收回来。做这件事的组件叫<strong>垃圾<span name="recycle">回收器</span></strong>。</p>
+<aside name="recycle">
+<p>「回收」其实是个更好的比喻。GC 并不把内存<strong>扔掉</strong>，而是把它收回来给新数据用。不过托管语言
+比「地球日」还老，所以发明者选了他们熟悉的类比。</p><img src="image/garbage-collection/recycle.png" class="above" alt="一个装满比特位的回收桶。" />
+</aside>
+<h2><a href="#可达性" id="可达性"><small>26&#8202;.&#8202;1</small>可达性</a></h2>
+<p>这引出了一个出奇困难的问题：VM 怎么知道哪些内存是<strong>不</strong>需要的？只有将来还会被读取的内存才是
+需要的，但除非有台时光机，实现怎么可能知道程序<strong>将会</strong>执行哪些代码、<strong>将会</strong>使用哪些数据？
+剧透一下：VM 不能穿越到未来。于是语言只能做一个<span name="conservative">保守</span>的近似：如果一块内存<strong>有可能</strong>在将来
+被读取，就认为它仍在使用中。</p>
+<aside name="conservative">
+<p>我这里说的「保守」是一般意义上的。确实存在一种叫「保守垃圾回收器」的东西，含义更具体。
+所有垃圾回收器都在某种意义上是「保守」的：只要一块内存<strong>可能</strong>被访问，就让它活着，而不是
+拥有一个能更精确预知哪些数据<strong>将会</strong>被访问的 Magic 8-Ball。</p>
+<p><strong>保守式 GC</strong> 是一种特殊的回收器：如果某块内存里的值看起来可能是个地址，它就把那块内存
+当作指针。这与<strong>精确式 GC</strong> 相对——后者正是我们要实现的——它确切知道内存里哪些字是指针，
+哪些存的是数字、字符串之类的其他值。</p>
+</aside>
+<p>这听起来<strong>太</strong>保守了。难道<strong>任何</strong>一块内存都有可能被读取吗？其实不然，至少在 Lox 这样的内存
+安全语言里不会。举个例子：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">a</span> = <span class="s">&quot;first value&quot;</span>;
+<span class="i">a</span> = <span class="s">&quot;updated&quot;</span>;
+<span class="c">// GC here.</span>
+<span class="k">print</span> <span class="i">a</span>;
+</pre></div>
+<p>假设我们在第二行的赋值完成之后运行 GC。字符串 &ldquo;first value&rdquo; 仍然待在内存里，但用户的程序
+已经没有任何办法够到它了。<code>a</code> 一被重新赋值，程序就失去了对那个字符串的任何引用。我们可以
+安全地释放它。如果存在某种途径让用户程序引用到一个值，这个值就是<strong>可达的</strong>；否则，就像这里
+的字符串 &ldquo;first value&rdquo; 那样，它是<strong>不可达的</strong>。</p>
+<p>VM 可以直接访问很多值。看看这个：</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">global</span> = <span class="s">&quot;string&quot;</span>;
+{
+  <span class="k">var</span> <span class="i">local</span> = <span class="s">&quot;another&quot;</span>;
+  <span class="k">print</span> <span class="i">global</span> + <span class="i">local</span>;
+}
+</pre></div>
+<p>在两个字符串刚拼好、<code>print</code> 语句还没执行的时候把程序暂停。VM 可以穿过全局变量表找到
+<code>global</code> 对应的条目，从而到达 <code>"string"</code>。它可以遍历值栈、命中局部变量 <code>local</code> 所在的槽位，
+从而找到 <code>"another"</code>。它甚至能找到拼接出来的字符串 <code>"stringanother"</code>，因为在我们暂停程序的
+那一刻，这个临时值也还待在 VM 的栈上。</p>
+<p>所有这些值都叫<strong>根</strong>。根是指 VM 不必经过其他对象里的引用就能直接到达的任何对象。大多数根
+是全局变量或在栈上，但正如我们后面会看到的，VM 还在另外几个地方存了它能找到的对象引用。</p>
+<p>还有一些值要通过另一个值里的引用才能找到。类实例上的<span name="class">字段</span>是最明显
+的情况，但我们还没有它们。即便没有这些，我们的 VM 仍然有间接引用。考虑：</p>
+<aside name="class">
+<p>我们<a href="classes-and-instances.html">很快</a>就会讲到！</p>
+</aside>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">makeClosure</span>() {
+  <span class="k">var</span> <span class="i">a</span> = <span class="s">&quot;data&quot;</span>;
+
+  <span class="k">fun</span> <span class="i">f</span>() { <span class="k">print</span> <span class="i">a</span>; }
+  <span class="k">return</span> <span class="i">f</span>;
+}
+
+{
+  <span class="k">var</span> <span class="i">closure</span> = <span class="i">makeClosure</span>();
+  <span class="c">// GC here.</span>
+  <span class="i">closure</span>();
+}
+</pre></div>
+<p>假设我们在标记行上暂停程序并运行垃圾回收器。当回收器做完、程序恢复执行时，它会调用那个
+闭包，闭包进而打印 <code>"data"</code>。所以回收器需要<strong>不</strong>释放那个字符串。可我们暂停程序时栈的样子是：</p><img src="image/garbage-collection/stack.png" alt="栈上只有脚本和闭包。" />
+<p><code>"data"</code> 根本不在栈上。它已经被搬离栈，移进了闭包使用的那个已关闭的 upvalue 里。闭包本身
+在栈上。但要够到那个字符串，我们得穿过闭包和它的 upvalue 数组。既然用户的程序<strong>确实</strong>可以
+这么做，那么所有这些间接可达的对象也同样被认为是可达的。</p><img src="image/garbage-collection/reachable.png" class="wide" alt="闭包引用的全部对象，以及从栈通向 'data' 字符串的路径。" />
+<p>这就给了我们一个关于可达性的归纳定义：</p>
+<ul>
+<li>
+<p>所有根都是可达的。</p>
+</li>
+<li>
+<p>从一个可达对象引用到的任何对象，它自身也是可达的。</p>
+</li>
+</ul>
+<p>这些就是仍然「活着」、需要留在内存里的值。任何<strong>不</strong>满足这个定义的值，都任凭回收器收割。
+这一对互相递归的规则，暗示着我们可以用一个递归算法来释放不需要的内存：</p>
+<ol>
+<li>
+<p>从根出发，沿着对象引用遍历，找出全部可达对象的集合。</p>
+</li>
+<li>
+<p>释放所有<strong>不</strong>在这个集合里的对象。</p>
+</li>
+</ol>
+<p>如今有<span name="handbook">各种各样</span>的垃圾回收算法在用，但它们大致都遵循同样的结构。
+有些可能会把两个步骤交错或混合，但那两个基本操作都在。它们主要区别在于<strong>如何</strong>执行每一步。</p>
+<aside name="handbook">
+<p>想探索别的 GC 算法的话，<a href="http://gchandbook.org/"><strong>《垃圾回收手册》</strong></a>（Jones 等人）是权威参考。在这样一个
+又深又窄的话题上，这样一本大书读起来还挺愉快。或者也许我对「乐趣」的理解有点奇怪。</p>
+</aside>
+<h2><a href="#标记-清除垃圾回收" id="标记-清除垃圾回收"><small>26&#8202;.&#8202;2</small>标记-清除垃圾回收</a></h2>
+<p>第一款托管语言是 Lisp，它是继 Fortran 之后发明的第二门「高层」语言。约翰·麦卡锡（John
+McCarthy）考虑过用手工内存管理或引用计数，但<span name="procrastination">最终</span>选择了
+（并命名了）垃圾回收——程序一旦内存告急，就回头去找回那些没在用的存储空间。</p>
+<aside name="procrastination">
+<p>在约翰·麦卡锡的《Lisp 历史》里他写道：「既然我们决定了用垃圾回收，它的实际实现就可以往后
+拖，因为当时做的都只是玩具例子。」我们选择把给 clox 加 GC 这件事一拖再拖，正是步巨人之后尘。</p>
+</aside>
+<p>他设计出了第一个、也是最简单的垃圾回收算法，叫做 <strong>mark-and-sweep</strong>，或者简称
+<strong>mark-sweep</strong>。关于它的描述，在最初那篇 Lisp 论文里只占三个短段落。尽管它又老又简单，
+同样的基本算法却支撑着许多现代内存管理器。CS 的某些角落似乎是不受时间影响的。</p>
+<p>正如名字所暗示的，标记-清除分两个阶段：</p>
+<ul>
+<li>
+<p><strong>标记：</strong> 我们从根出发，遍历或<span name="trace"><strong>追踪</strong></span>这些根所引用的所有对象。
+这是一次对全部可达对象的经典图遍历。每当我们访问一个对象，就以某种方式把它<strong>标记</strong>起来。
+（不同实现在如何记录这个标记上各有差异。）</p>
+</li>
+<li>
+<p><strong>清除：</strong> 标记阶段一结束，堆里每个可达对象都已被标记。这意味着任何未被标记的对象都是
+不可达的，正等着被回收。我们遍历所有未标记的对象，把每一个都释放掉。</p>
+</li>
+</ul>
+<p>看起来大致是这样：</p><img src="image/garbage-collection/mark-sweep.png" class="wide" alt="从一张对象图出发，先标记可达的那些，清除剩下的，最后只剩可达的。" />
+<aside name="trace">
+<p><strong>追踪式垃圾回收器</strong>指的是任何沿着对象引用图追踪的算法。这与引用计数相对，后者用的是另一套
+追踪可达对象的策略。</p>
+</aside>
+<p>这就是我们要实现的东西。每当我们决定是时候回收一些字节了，我们就追踪一切、标记所有可达
+对象、释放没被标记的那些，然后恢复用户的程序。</p>
+<h3><a href="#收集垃圾" id="收集垃圾"><small>26&#8202;.&#8202;2&#8202;.&#8202;1</small>收集垃圾</a></h3>
+<p>整章讲的就是实现这一个<span name="one">函数</span>：</p>
+<aside name="one">
+<p>当然，我们最后还会加上一堆辅助函数。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+</pre><div class="source-file"><em>memory.h</em><br>
+加在 <em>reallocate</em>() 之后</div>
+<pre class="insert"><span class="t">void</span> <span class="i">collectGarbage</span>();
+</pre><pre class="insert-after">void freeObjects();
+</pre></div>
+<div class="source-file-narrow"><em>memory.h</em>, 加在 <em>reallocate</em>() 之后</div>
+
+<p>我们从这个空壳开始，一步步做到完整实现：</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>freeObject</em>() 之后</div>
+<pre><span class="t">void</span> <span class="i">collectGarbage</span>() {
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>freeObject</em>() 之后</div>
+
+<p>你可能会问的第一个问题是：这个函数什么时候被调用？事实证明这是个微妙的问题，本章后面我们会
+花些时间讨论。现在我们先绕开它，顺手给自己造一个顺手的诊断工具。</p>
+<div class="codehilite"><pre class="insert-before">#define DEBUG_TRACE_EXECUTION
+</pre><div class="source-file"><em>common.h</em></div>
+<pre class="insert">
+
+<span class="a">#define DEBUG_STRESS_GC</span>
+</pre><pre class="insert-after">
+
+#define UINT8_COUNT (UINT8_MAX + 1)
+</pre></div>
+<div class="source-file-narrow"><em>common.h</em></div>
+
+<p>我们给垃圾回收器加一个可选的「压力测试」模式。这个标志一旦定义，GC 就会尽可能频繁地运行。
+这显然对性能是灾难性的。但它非常适合把那些只有在 GC 恰好在某个时刻被触发时才会出现的内存
+管理 bug 给冲出来。如果<strong>每个</strong>时刻都触发一次 GC，你多半能把那些 bug 找出来。</p>
+<div class="codehilite"><pre class="insert-before">void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>reallocate</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">newSize</span> &gt; <span class="i">oldSize</span>) {
+<span class="a">#ifdef DEBUG_STRESS_GC</span>
+    <span class="i">collectGarbage</span>();
+<span class="a">#endif</span>
+  }
+
+</pre><pre class="insert-after">  if (newSize == 0) {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>reallocate</em>() 内</div>
+
+<p>每当我们调用 <code>reallocate()</code> 去获取更多内存时，我们都强制跑一次回收。那个 if 检查是因为
+<code>reallocate()</code> 也会被用来释放或收缩一块已分配的内存。我们不想为那种事触发 GC——尤其是因为
+GC 自己也会调用 <code>reallocate()</code> 来释放内存。</p>
+<p>紧挨着<span name="demand">分配</span>之前做回收，是把 GC 接进 VM 的经典做法。你本来就在调用
+内存管理器，那是个很容易挂钩子的地方。另外，分配是你真正<strong>需要</strong>腾出一些已释放内存来复用的
+唯一时刻。如果<strong>不</strong>用分配来触发 GC，就得确保代码里每一个可能循环并分配内存的地方都另有
+办法触发回收器。否则 VM 会陷入一种饥饿状态：它需要更多内存，却从不回收。</p>
+<aside name="demand">
+<p>更精巧的回收器可能会跑在单独的线程上，或者在程序执行期间周期性地交错进行——通常是在函数
+调用边界处，或者发生向后跳转时。</p>
+</aside>
+<h3><a href="#调试日志" id="调试日志"><small>26&#8202;.&#8202;2&#8202;.&#8202;2</small>调试日志</a></h3>
+<p>既然说到诊断，我们再加一些。我在垃圾回收器上遇到的一个真实难题是它们太不透明。到目前为止
+我们跑大量 Lox 程序一直好好的，压根<strong>没有</strong> GC。加上了之后，我们怎么知道它有没有在干有用的
+事？是不是只有写那种挥霍掉成片内存的程序才能看出来？又该怎么调试？</p>
+<p>照亮 GC 的内部运作，一个简单的办法是加些日志。</p>
+<div class="codehilite"><pre class="insert-before">#define DEBUG_STRESS_GC
+</pre><div class="source-file"><em>common.h</em></div>
+<pre class="insert"><span class="a">#define DEBUG_LOG_GC</span>
+</pre><pre class="insert-after">
+
+#define UINT8_COUNT (UINT8_MAX + 1)
+</pre></div>
+<div class="source-file-narrow"><em>common.h</em></div>
+
+<p>打开之后，clox 在对动态内存做操作时会往控制台打印信息。</p>
+<p>我们需要几个 include。</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;vm.h&quot;
+</pre><div class="source-file"><em>memory.c</em></div>
+<pre class="insert">
+
+<span class="a">#ifdef DEBUG_LOG_GC</span>
+<span class="a">#include &lt;stdio.h&gt;</span>
+<span class="a">#include &quot;debug.h&quot;</span>
+<span class="a">#endif</span>
+</pre><pre class="insert-after">
+
+void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em></div>
+
+<p>我们还没有回收器，但可以先开始塞一些日志进去。我们会想知道一次回收是什么时候开始的。</p>
+<div class="codehilite"><pre class="insert-before">void collectGarbage() {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert"><span class="a">#ifdef DEBUG_LOG_GC</span>
+  <span class="i">printf</span>(<span class="s">&quot;-- gc begin</span><span class="e">\n</span><span class="s">&quot;</span>);
+<span class="a">#endif</span>
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>最终我们还会在回收过程中记录其他操作，所以也得知道什么时候一切结束。</p>
+<div class="codehilite"><pre class="insert-before">  printf(&quot;-- gc begin\n&quot;);
+#endif
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">
+
+<span class="a">#ifdef DEBUG_LOG_GC</span>
+  <span class="i">printf</span>(<span class="s">&quot;-- gc end</span><span class="e">\n</span><span class="s">&quot;</span>);
+<span class="a">#endif</span>
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>我们还没有回收器的代码，但已经有了分配和释放的函数，所以现在就能给它们装上仪表。</p>
+<div class="codehilite"><pre class="insert-before">  vm.objects = object;
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>allocateObject</em>() 内</div>
+<pre class="insert">
+
+<span class="a">#ifdef DEBUG_LOG_GC</span>
+  <span class="i">printf</span>(<span class="s">&quot;%p allocate %zu for %d</span><span class="e">\n</span><span class="s">&quot;</span>, (<span class="t">void</span>*)<span class="i">object</span>, <span class="i">size</span>, <span class="i">type</span>);
+<span class="a">#endif</span>
+
+</pre><pre class="insert-after">  return object;
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>allocateObject</em>() 内</div>
+
+<p>以及在对象生命周期的末尾：</p>
+<div class="codehilite"><pre class="insert-before">static void freeObject(Obj* object) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObject</em>() 内</div>
+<pre class="insert"><span class="a">#ifdef DEBUG_LOG_GC</span>
+  <span class="i">printf</span>(<span class="s">&quot;%p free type %d</span><span class="e">\n</span><span class="s">&quot;</span>, (<span class="t">void</span>*)<span class="i">object</span>, <span class="i">object</span>-&gt;<span class="i">type</span>);
+<span class="a">#endif</span>
+
+</pre><pre class="insert-after">  switch (object-&gt;type) {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObject</em>() 内</div>
+
+<p>有了这两个标志，我们在推进本章剩余部分时应该能看出进展。</p>
+<h2><a href="#标记根" id="标记根"><small>26&#8202;.&#8202;3</small>标记根</a></h2>
+<p>对象像夜空里繁星一样散落在堆上。一个对象到另一个对象的引用形成一条连线，而这些星座就是
+标记阶段要遍历的图。标记从根开始。</p>
+<div class="codehilite"><pre class="insert-before">#ifdef DEBUG_LOG_GC
+  printf(&quot;-- gc begin\n&quot;);
+#endif
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">markRoots</span>();
+</pre><pre class="insert-after">
+
+#ifdef DEBUG_LOG_GC
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>大多数根是待在 VM 栈里的局部变量或临时值，所以我们先遍历栈。</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>freeObject</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">markRoots</span>() {
+  <span class="k">for</span> (<span class="t">Value</span>* <span class="i">slot</span> = <span class="i">vm</span>.<span class="i">stack</span>; <span class="i">slot</span> &lt; <span class="i">vm</span>.<span class="i">stackTop</span>; <span class="i">slot</span>++) {
+    <span class="i">markValue</span>(*<span class="i">slot</span>);
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>freeObject</em>() 之后</div>
+
+<p>要标记一个 Lox 值，我们用这个新函数：</p>
+<div class="codehilite"><pre class="insert-before">void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+</pre><div class="source-file"><em>memory.h</em><br>
+加在 <em>reallocate</em>() 之后</div>
+<pre class="insert"><span class="t">void</span> <span class="i">markValue</span>(<span class="t">Value</span> <span class="i">value</span>);
+</pre><pre class="insert-after">void collectGarbage();
+</pre></div>
+<div class="source-file-narrow"><em>memory.h</em>, 加在 <em>reallocate</em>() 之后</div>
+
+<p>它的实现在这里：</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>reallocate</em>() 之后</div>
+<pre><span class="t">void</span> <span class="i">markValue</span>(<span class="t">Value</span> <span class="i">value</span>) {
+  <span class="k">if</span> (<span class="a">IS_OBJ</span>(<span class="i">value</span>)) <span class="i">markObject</span>(<span class="a">AS_OBJ</span>(<span class="i">value</span>));
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>reallocate</em>() 之后</div>
+
+<p>有些 Lox 值——数字、布尔值和 <code>nil</code>——是直接内联存在 Value 里的，不需要堆分配。垃圾回收器
+完全不用为它们操心，所以我们首先确保这个值确实是一个堆对象。如果是，真正的工作就在这个函数里：</p>
+<div class="codehilite"><pre class="insert-before">void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+</pre><div class="source-file"><em>memory.h</em><br>
+加在 <em>reallocate</em>() 之后</div>
+<pre class="insert"><span class="t">void</span> <span class="i">markObject</span>(<span class="t">Obj</span>* <span class="i">object</span>);
+</pre><pre class="insert-after">void markValue(Value value);
+</pre></div>
+<div class="source-file-narrow"><em>memory.h</em>, 加在 <em>reallocate</em>() 之后</div>
+
+<p>它定义在这里：</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>reallocate</em>() 之后</div>
+<pre><span class="t">void</span> <span class="i">markObject</span>(<span class="t">Obj</span>* <span class="i">object</span>) {
+  <span class="k">if</span> (<span class="i">object</span> == <span class="a">NULL</span>) <span class="k">return</span>;
+  <span class="i">object</span>-&gt;<span class="i">isMarked</span> = <span class="k">true</span>;
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>reallocate</em>() 之后</div>
+
+<p>从 <code>markValue()</code> 调用过来时，那个 <code>NULL</code> 检查是多余的。任何属于某种 Obj 类型的 Lox Value
+都会带一个有效指针。但以后我们会从别处直接调用这个函数，而在其中一些地方，被指向的对象是
+可选的。</p>
+<p>假定我们确实有一个有效对象，我们通过设置一个标志来标记它。这个新字段位于所有对象共享的
+Obj 头部结构里。</p>
+<div class="codehilite"><pre class="insert-before">  ObjType type;
+</pre><div class="source-file"><em>object.h</em><br>
+在结构体 <em>Obj</em> 内</div>
+<pre class="insert">  <span class="t">bool</span> <span class="i">isMarked</span>;
+</pre><pre class="insert-after">  struct Obj* next;
+</pre></div>
+<div class="source-file-narrow"><em>object.h</em>, 在结构体 <em>Obj</em> 内</div>
+
+<p>每个新对象生来都是未标记的，因为我们还没判定它到底可达还是不可达。</p>
+<div class="codehilite"><pre class="insert-before">  object-&gt;type = type;
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>allocateObject</em>() 内</div>
+<pre class="insert">  <span class="i">object</span>-&gt;<span class="i">isMarked</span> = <span class="k">false</span>;
+</pre><pre class="insert-after">
+
+  object-&gt;next = vm.objects;
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>allocateObject</em>() 内</div>
+
+<p>在继续往前之前，先给 <code>markObject()</code> 加些日志。</p>
+<div class="codehilite"><pre class="insert-before">void markObject(Obj* object) {
+  if (object == NULL) return;
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markObject</em>() 内</div>
+<pre class="insert"><span class="a">#ifdef DEBUG_LOG_GC</span>
+  <span class="i">printf</span>(<span class="s">&quot;%p mark &quot;</span>, (<span class="t">void</span>*)<span class="i">object</span>);
+  <span class="i">printValue</span>(<span class="a">OBJ_VAL</span>(<span class="i">object</span>));
+  <span class="i">printf</span>(<span class="s">&quot;</span><span class="e">\n</span><span class="s">&quot;</span>);
+<span class="a">#endif</span>
+
+</pre><pre class="insert-after">  object-&gt;isMarked = true;
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markObject</em>() 内</div>
+
+<p>这样我们就能看到标记阶段在做什么。标记栈处理掉了局部变量和临时值。根的另一个主要来源是
+全局变量。</p>
+<div class="codehilite"><pre class="insert-before">    markValue(*slot);
+  }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markRoots</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">markTable</span>(&amp;<span class="i">vm</span>.<span class="i">globals</span>);
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markRoots</em>() 内</div>
+
+<p>它们住在 VM 拥有的一张哈希表里，所以我们再声明一个辅助函数，用来标记一张表里的所有对象。</p>
+<div class="codehilite"><pre class="insert-before">ObjString* tableFindString(Table* table, const char* chars,
+                           int length, uint32_t hash);
+</pre><div class="source-file"><em>table.h</em><br>
+加在 <em>tableFindString</em>() 之后</div>
+<pre class="insert"><span class="t">void</span> <span class="i">markTable</span>(<span class="t">Table</span>* <span class="i">table</span>);
+</pre><pre class="insert-after">
+
+#endif
+</pre></div>
+<div class="source-file-narrow"><em>table.h</em>, 加在 <em>tableFindString</em>() 之后</div>
+
+<p>我们在「table」模块里这样实现：</p>
+<div class="codehilite"><div class="source-file"><em>table.c</em><br>
+加在 <em>tableFindString</em>() 之后</div>
+<pre><span class="t">void</span> <span class="i">markTable</span>(<span class="t">Table</span>* <span class="i">table</span>) {
+  <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="i">table</span>-&gt;<span class="i">capacity</span>; <span class="i">i</span>++) {
+    <span class="t">Entry</span>* <span class="i">entry</span> = &amp;<span class="i">table</span>-&gt;<span class="i">entries</span>[<span class="i">i</span>];
+    <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">entry</span>-&gt;<span class="i">key</span>);
+    <span class="i">markValue</span>(<span class="i">entry</span>-&gt;<span class="i">value</span>);
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>table.c</em>, 加在 <em>tableFindString</em>() 之后</div>
+
+<p>相当直白。我们遍历条目数组。对每一条，我们标记它的值。因为那些字符串也由 GC 管理，我们还
+要标记每个条目的键字符串。</p>
+<h3><a href="#不那么明显的根" id="不那么明显的根"><small>26&#8202;.&#8202;3&#8202;.&#8202;1</small>不那么明显的根</a></h3>
+<p>这些覆盖了我们通常会想到的根——那些因为存在用户程序可见的变量里而显然可达的值。但 VM 自己
+还有几个藏私的地方，偷偷藏着它直接访问的那些值的引用。</p>
+<p>大部分函数调用状态住在值栈里，但 VM 还维护着一个独立的 CallFrame 栈。每个 CallFrame 都含有
+一个指向被调用闭包的指针。VM 用这些指针去访问常量和 upvalue，所以那些闭包也得留着。</p>
+<div class="codehilite"><pre class="insert-before">  }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markRoots</em>() 内</div>
+<pre class="insert">
+
+  <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="i">vm</span>.<span class="i">frameCount</span>; <span class="i">i</span>++) {
+    <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">vm</span>.<span class="i">frames</span>[<span class="i">i</span>].<span class="i">closure</span>);
+  }
+</pre><pre class="insert-after">
+
+  markTable(&amp;vm.globals);
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markRoots</em>() 内</div>
+
+<p>说到 upvalue，open upvalue 列表是另一组 VM 可以直接够到的值。</p>
+<div class="codehilite"><pre class="insert-before">  for (int i = 0; i &lt; vm.frameCount; i++) {
+    markObject((Obj*)vm.frames[i].closure);
+  }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markRoots</em>() 内</div>
+<pre class="insert">
+
+  <span class="k">for</span> (<span class="t">ObjUpvalue</span>* <span class="i">upvalue</span> = <span class="i">vm</span>.<span class="i">openUpvalues</span>;
+       <span class="i">upvalue</span> != <span class="a">NULL</span>;
+       <span class="i">upvalue</span> = <span class="i">upvalue</span>-&gt;<span class="i">next</span>) {
+    <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">upvalue</span>);
+  }
+</pre><pre class="insert-after">
+
+  markTable(&amp;vm.globals);
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markRoots</em>() 内</div>
+
+<p>还要记住，一次回收可能在<strong>任何</strong>一次分配期间开始。这些分配并不只在用户程序运行时发生。编译器
+本身也会周期性地从堆上抓内存，用来放字面量和常量表。如果 GC 在我们编译到一半时跑起来，那么
+编译器直接访问的那些值也得当作根来对待。</p>
+<p>为了保持编译器模块与 VM 其余部分干净地分离，我们把这件事放进一个单独的函数。</p>
+<div class="codehilite"><pre class="insert-before">  markTable(&amp;vm.globals);
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markRoots</em>() 内</div>
+<pre class="insert">  <span class="i">markCompilerRoots</span>();
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markRoots</em>() 内</div>
+
+<p>它声明在这里：</p>
+<div class="codehilite"><pre class="insert-before">ObjFunction* compile(const char* source);
+</pre><div class="source-file"><em>compiler.h</em><br>
+加在 <em>compile</em>() 之后</div>
+<pre class="insert"><span class="t">void</span> <span class="i">markCompilerRoots</span>();
+</pre><pre class="insert-after">
+
+#endif
+</pre></div>
+<div class="source-file-narrow"><em>compiler.h</em>, 加在 <em>compile</em>() 之后</div>
+
+<p>这意味着「memory」模块需要一个 include。</p>
+<div class="codehilite"><pre class="insert-before">#include &lt;stdlib.h&gt;
+
+</pre><div class="source-file"><em>memory.c</em></div>
+<pre class="insert"><span class="a">#include &quot;compiler.h&quot;</span>
+</pre><pre class="insert-after">#include &quot;memory.h&quot;
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em></div>
+
+<p>定义则在「compiler」模块那边。</p>
+<div class="codehilite"><div class="source-file"><em>compiler.c</em><br>
+加在 <em>compile</em>() 之后</div>
+<pre><span class="t">void</span> <span class="i">markCompilerRoots</span>() {
+  <span class="t">Compiler</span>* <span class="i">compiler</span> = <span class="i">current</span>;
+  <span class="k">while</span> (<span class="i">compiler</span> != <span class="a">NULL</span>) {
+    <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">compiler</span>-&gt;<span class="i">function</span>);
+    <span class="i">compiler</span> = <span class="i">compiler</span>-&gt;<span class="i">enclosing</span>;
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em>, 加在 <em>compile</em>() 之后</div>
+
+<p>幸运的是，编译器攥着的值并不多。它唯一用到的对象就是它正在编译进去的那个 ObjFunction。由于
+函数声明可以嵌套，编译器有一个由这些 ObjFunction 组成的链表，我们遍历整个列表。</p>
+<p>因为是「compiler」模块在调用 <code>markObject()</code>，它也需要一个 include。</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;compiler.h&quot;
+</pre><div class="source-file"><em>compiler.c</em></div>
+<pre class="insert"><span class="a">#include &quot;memory.h&quot;</span>
+</pre><pre class="insert-after">#include &quot;scanner.h&quot;
+</pre></div>
+<div class="source-file-narrow"><em>compiler.c</em></div>
+
+<p>根就这些。跑完这一遍，VM——运行时和编译器——所有<strong>不必</strong>经过其他对象就能到达的对象，
+它们的标记位都被设上了。</p>
+<h2><a href="#追踪对象引用" id="追踪对象引用"><small>26&#8202;.&#8202;4</small>追踪对象引用</a></h2>
+<p>标记过程的下一步，是沿着对象之间的引用图追踪，找出间接可达的值。我们还没有带字段的实例，
+所以含引用的对象不多，但我们确实<span name="some">有一些</span>。具体来说，ObjClosure 既
+有它闭包捕获的 ObjUpvalue 列表，也有对它所包装的原始 ObjFunction 的引用。而 ObjFunction
+本身又有一张常量表，里面装着函数体里创建的所有字面量的引用。对我们的回收器来说，这已经足够
+织出一张相当复杂的对象之网去爬了。</p>
+<aside name="some">
+<p>我特意把这一章插在书的这个位置，正是<strong>因为</strong>我们现在有了闭包，能给垃圾回收器提供有意思的对象
+来处理。</p>
+</aside>
+<p>现在是实现这个遍历的时候了。我们可以广度优先、深度优先，或者用别的顺序。既然我们只需要找出
+全部可达对象的<strong>集合</strong>，访问它们的<span name="dfs">顺序</span>大多无关紧要。</p>
+<aside name="dfs">
+<p>我说「大多」，是因为有些垃圾回收器会按访问顺序搬动对象，所以遍历顺序决定了哪些对象最终在
+内存里彼此相邻。这会影响性能，因为 CPU 靠局部性来决定该把哪些内存预载进缓存。</p>
+<p>即便遍历顺序真的重要，也说不清哪种顺序<strong>最好</strong>。很难确定对象将来会按什么顺序被使用，所以 GC
+很难知道哪种顺序对性能有帮助。</p>
+</aside>
+<h3><a href="#三色抽象" id="三色抽象"><small>26&#8202;.&#8202;4&#8202;.&#8202;1</small>三色抽象</a></h3>
+<p>当回收器在对象图里游走时，我们得确保它不会跟丢自己的位置，也不会绕圈子困住。这对增量式 GC
+这类高级实现尤其要紧——它们会把标记与用户程序的部分执行交错起来。回收器必须能够暂停，
+并在之后从停下的地方接着做。</p>
+<p>为了帮我们这些脑子不太够用的人推理这个复杂过程，VM 黑客们想出了一个叫做 <span name="color"></span><strong>三色抽象</strong> 的比喻。
+每个对象都有一个概念上的「颜色」，用来跟踪对象处于什么状态、还剩什么工作要做。</p>
+<aside name="color">
+<p>高级垃圾回收算法常常会往这个抽象里再加别的颜色。我见过好几种灰，甚至在某些设计里有紫色。
+可惜，我那张「淡紫-黄绿-洋红-孔雀石绿」色的回收器论文没被接收发表。</p>
+</aside>
+<ul>
+<li>
+<p><strong><img src="image/garbage-collection/white.png" alt="一个白色圆圈。"
+class="dot" /> 白色：</strong> 在垃圾回收开始时，每个对象都是白色。这个颜色表示我们根本还没
+到达或处理过这个对象。</p>
+</li>
+<li>
+<p><strong><img src="image/garbage-collection/gray.png" alt="一个灰色圆圈。"
+class="dot" /> 灰色：</strong> 在标记过程中，我们第一次到达某个对象时，把它染成灰色。这个颜色
+表示我们知道该对象本身是可达的、不应被回收。但我们还没有<strong>穿过</strong>它去看它引用了<strong>哪些</strong>其他
+对象。用图算法的术语说，这就是<strong>待处理列表</strong>——我们已经知道但还没处理的那批对象。</p>
+</li>
+<li>
+<p><strong><img src="image/garbage-collection/black.png" alt="一个黑色圆圈。"
+class="dot" /> 黑色：</strong> 当我们拿走一个灰色对象并标记了它引用的所有对象之后，就把这个灰色
+对象转成黑色。这个颜色表示标记阶段处理完了那个对象。</p>
+</li>
+</ul>
+<p>用这套抽象来说，标记过程现在长这样：</p>
+<ol>
+<li>
+<p>一开始让所有对象都是白色。</p>
+</li>
+<li>
+<p>找出所有根，把它们标成灰色。</p>
+</li>
+<li>
+<p>只要还有灰色对象就重复：</p>
+<ol>
+<li>
+<p>挑一个灰色对象。把它提到的任何白色对象转成灰色。</p>
+</li>
+<li>
+<p>把原来那个灰色对象标成黑色。</p>
+</li>
+</ol>
+</li>
+</ol>
+<p>我发现这样想有助于理解。你有一张对象之间带引用的网。起初它们都是些白色小点。旁边有一些从 VM
+进来的边指向那些根。那些根变成灰色。然后每个灰色对象的同胞变成灰色，而它自己变成黑色。
+最终的效果是一道灰色波前扫过整张图，身后留下一片可达的黑色对象。不可达的对象波前碰都不碰，
+一直是白色。</p><img src="image/garbage-collection/tricolor-trace.png" class="wide" alt="一道灰色波前在节点图里推进。" />
+<p>到<span name="invariant">最后</span>，你剩下的是一片被触及的黑色对象海洋，其中散布着一座座
+白色对象的小岛，可以被扫走并释放掉。一旦不可达的对象被释放，剩下的对象——全是黑色的——会
+被重置为白色，进入下一个垃圾回收周期。</p>
+<aside name="invariant">
+<p>注意在这个过程的每一步，都没有任何黑节点指向白节点。这条性质叫做<strong>三色不变式</strong>。遍历过程
+维持这条不变式，以确保可达的对象永远不会被回收。</p>
+</aside>
+<h3><a href="#给灰色对象做一个待处理列表" id="给灰色对象做一个待处理列表"><small>26&#8202;.&#8202;4&#8202;.&#8202;2</small>给灰色对象做一个待处理列表</a></h3>
+<p>在我们的实现里，根已经被标记过了。它们全都是灰色的。下一步是开始挑出它们、遍历它们的引用。
+但我们没有方便的办法把它们找出来。我们只是在对象上设了一个字段，仅此而已。我们不想非得
+遍历整个对象列表去找那些设了这个字段的对象。</p>
+<p>所以我们另外建一个待处理列表，来跟踪所有灰色对象。当一个对象变成灰色时，除了设置标记字段，
+我们还把它加进待处理列表。</p>
+<div class="codehilite"><pre class="insert-before">  object-&gt;isMarked = true;
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markObject</em>() 内</div>
+<pre class="insert">
+
+  <span class="k">if</span> (<span class="i">vm</span>.<span class="i">grayCapacity</span> &lt; <span class="i">vm</span>.<span class="i">grayCount</span> + <span class="n">1</span>) {
+    <span class="i">vm</span>.<span class="i">grayCapacity</span> = <span class="a">GROW_CAPACITY</span>(<span class="i">vm</span>.<span class="i">grayCapacity</span>);
+    <span class="i">vm</span>.<span class="i">grayStack</span> = (<span class="t">Obj</span>**)<span class="i">realloc</span>(<span class="i">vm</span>.<span class="i">grayStack</span>,
+                                  <span class="k">sizeof</span>(<span class="t">Obj</span>*) * <span class="i">vm</span>.<span class="i">grayCapacity</span>);
+  }
+
+  <span class="i">vm</span>.<span class="i">grayStack</span>[<span class="i">vm</span>.<span class="i">grayCount</span>++] = <span class="i">object</span>;
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markObject</em>() 内</div>
+
+<p>任何一种便于放入和取出的数据结构都可以。我选了栈，因为在 C 里用动态数组实现它最简单。它的
+工作方式跟我们在 Lox 里建过的其他动态数组差不多，<strong>不过</strong>要注意，它调用的是<strong>系统</strong>的 <code>realloc()</code>
+函数，而不是我们自己的 <code>reallocate()</code> 包装器。灰栈自身的内存<strong>不</strong>由垃圾回收器管理。我们不想
+因为在 GC 期间扩大灰栈而让 GC 递归地启动一次新的 GC。那可能把时空连续体撕开一个口子。</p>
+<p>我们自己显式地管理它的内存。灰栈归 VM 所有。</p>
+<div class="codehilite"><pre class="insert-before">  Obj* objects;
+</pre><div class="source-file"><em>vm.h</em><br>
+在结构体 <em>VM</em> 内</div>
+<pre class="insert">  <span class="t">int</span> <span class="i">grayCount</span>;
+  <span class="t">int</span> <span class="i">grayCapacity</span>;
+  <span class="t">Obj</span>** <span class="i">grayStack</span>;
+</pre><pre class="insert-after">} VM;
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em>, 在结构体 <em>VM</em> 内</div>
+
+<p>它一开始是空的。</p>
+<div class="codehilite"><pre class="insert-before">  vm.objects = NULL;
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>initVM</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">vm</span>.<span class="i">grayCount</span> = <span class="n">0</span>;
+  <span class="i">vm</span>.<span class="i">grayCapacity</span> = <span class="n">0</span>;
+  <span class="i">vm</span>.<span class="i">grayStack</span> = <span class="a">NULL</span>;
+</pre><pre class="insert-after">
+
+  initTable(&amp;vm.globals);
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>initVM</em>() 内</div>
+
+<p>VM 关闭时我们还得释放它。</p>
+<div class="codehilite"><pre class="insert-before">    object = next;
+  }
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>freeObjects</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">free</span>(<span class="i">vm</span>.<span class="i">grayStack</span>);
+</pre><pre class="insert-after">}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>freeObjects</em>() 内</div>
+
+<p><span name="robust">我们</span>全权负责这个数组。这也包括分配失败的情况。如果我们没法创建或扩大灰栈，那就没法完成
+这次垃圾回收。对 VM 来说这是坏消息，不过幸好很少见，因为灰栈通常挺小的。能有更优雅的处理当然
+更好，但为了保持本书代码简单，我们就是直接中止。</p>
+<aside name="robust">
+<p>想更健壮的话，我们可以在 VM 启动时先分配一块「雨天基金」内存。如果灰栈分配失败，我们就释放
+那块雨天基金再试一次。那也许能给我们在堆上腾出足够的回旋余地，把灰栈创建出来、完成 GC，
+再释放出更多内存。</p>
+</aside>
+<div class="codehilite"><pre class="insert-before">    vm.grayStack = (Obj**)realloc(vm.grayStack,
+                                  sizeof(Obj*) * vm.grayCapacity);
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markObject</em>() 内</div>
+<pre class="insert">
+
+    <span class="k">if</span> (<span class="i">vm</span>.<span class="i">grayStack</span> == <span class="a">NULL</span>) <span class="i">exit</span>(<span class="n">1</span>);
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markObject</em>() 内</div>
+
+<h3><a href="#处理灰色对象" id="处理灰色对象"><small>26&#8202;.&#8202;4&#8202;.&#8202;3</small>处理灰色对象</a></h3>
+<p>好，现在标记完根之后，我们既设了一批字段，也把工作列表填满了等着啃的对象。是时候进入下一个
+阶段了。</p>
+<div class="codehilite"><pre class="insert-before">  markRoots();
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">  <span class="i">traceReferences</span>();
+</pre><pre class="insert-after">
+
+#ifdef DEBUG_LOG_GC
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>实现在这里：</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>markRoots</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">traceReferences</span>() {
+  <span class="k">while</span> (<span class="i">vm</span>.<span class="i">grayCount</span> &gt; <span class="n">0</span>) {
+    <span class="t">Obj</span>* <span class="i">object</span> = <span class="i">vm</span>.<span class="i">grayStack</span>[--<span class="i">vm</span>.<span class="i">grayCount</span>];
+    <span class="i">blackenObject</span>(<span class="i">object</span>);
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>markRoots</em>() 之后</div>
+
+<p>它跟前面那段文字算法几乎一模一样。在栈被掏空之前，我们不断取出灰色对象、遍历它们的引用，
+然后把它们标成黑色。遍历一个对象的引用可能翻出一些新的白色对象，它们被标成灰色并加进栈。
+所以这个函数在「把白色对象变灰」和「把灰色对象变黑」之间来回摆动，逐步把整道波前往前推。</p>
+<p>这里是遍历单个对象引用的地方：</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>markValue</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">blackenObject</span>(<span class="t">Obj</span>* <span class="i">object</span>) {
+  <span class="k">switch</span> (<span class="i">object</span>-&gt;<span class="i">type</span>) {
+    <span class="k">case</span> <span class="a">OBJ_NATIVE</span>:
+    <span class="k">case</span> <span class="a">OBJ_STRING</span>:
+      <span class="k">break</span>;
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>markValue</em>() 之后</div>
+
+<p>每种对象<span name="leaf">类型</span>有不同的、可能引用其他对象的字段，所以每种类型都需要
+专门的一大段代码。我们从容易的开始——字符串和原生函数对象不含任何对外引用，没什么可遍历的。</p>
+<aside name="leaf">
+<p>在 <code>markObject()</code> 里有个简单的优化可以做：干脆别把字符串和原生函数加进灰栈，因为我们知道它们
+不需要被处理。它们可以直接从白色变黑。</p>
+</aside>
+<p>注意我们并没有在被遍历的对象自身上设置任何状态。对象的状态里没有对「黑色」的直接编码。
+一个黑色对象就是任何 <code>isMarked</code> 字段被<span name="field">设置</span>、且已经不在灰栈里的对象。</p>
+<aside name="field">
+<p>你完全有理由纳闷我们为什么干脆不要那个 <code>isMarked</code> 字段。时机到了，朋友。</p>
+</aside>
+<p>现在我们开始把其他对象类型加进来。最简单的是 upvalue。</p>
+<div class="codehilite"><pre class="insert-before">static void blackenObject(Obj* object) {
+  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_UPVALUE</span>:
+      <span class="i">markValue</span>(((<span class="t">ObjUpvalue</span>*)<span class="i">object</span>)-&gt;<span class="i">closed</span>);
+      <span class="k">break</span>;
+</pre><pre class="insert-after">    case OBJ_NATIVE:
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>当一个 upvalue 被关闭时，它含有一个指向被捕获值的引用。既然那个值已经不在栈上了，我们就得
+确保从 upvalue 出发追踪这个引用。</p>
+<p>接下来是函数。</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_FUNCTION</span>: {
+      <span class="t">ObjFunction</span>* <span class="i">function</span> = (<span class="t">ObjFunction</span>*)<span class="i">object</span>;
+      <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">function</span>-&gt;<span class="i">name</span>);
+      <span class="i">markArray</span>(&amp;<span class="i">function</span>-&gt;<span class="i">chunk</span>.<span class="i">constants</span>);
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_UPVALUE:
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>每个函数都有一个指向 ObjString 的引用，那个字符串装着函数名。更重要的是，函数有一张塞满
+其他对象引用的常量表。我们用这个辅助函数追踪它们：</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>markValue</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">markArray</span>(<span class="t">ValueArray</span>* <span class="i">array</span>) {
+  <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="i">array</span>-&gt;<span class="i">count</span>; <span class="i">i</span>++) {
+    <span class="i">markValue</span>(<span class="i">array</span>-&gt;<span class="i">values</span>[<span class="i">i</span>]);
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>markValue</em>() 之后</div>
+
+<p>我们目前最后一种对象类型——后面几章还会加更多——是闭包。</p>
+<div class="codehilite"><pre class="insert-before">  switch (object-&gt;type) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert">    <span class="k">case</span> <span class="a">OBJ_CLOSURE</span>: {
+      <span class="t">ObjClosure</span>* <span class="i">closure</span> = (<span class="t">ObjClosure</span>*)<span class="i">object</span>;
+      <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">closure</span>-&gt;<span class="i">function</span>);
+      <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="i">closure</span>-&gt;<span class="i">upvalueCount</span>; <span class="i">i</span>++) {
+        <span class="i">markObject</span>((<span class="t">Obj</span>*)<span class="i">closure</span>-&gt;<span class="i">upvalues</span>[<span class="i">i</span>]);
+      }
+      <span class="k">break</span>;
+    }
+</pre><pre class="insert-after">    case OBJ_FUNCTION: {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>每个闭包都有一个指向它所包装的裸函数的引用，以及一个指向它所捕获的各个 upvalue 的指针数组。
+我们把这些全都追踪一遍。</p>
+<p>这就是处理一个灰色对象的基本机制，但还有两个尾巴要收。第一，加些日志。</p>
+<div class="codehilite"><pre class="insert-before">static void blackenObject(Obj* object) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>blackenObject</em>() 内</div>
+<pre class="insert"><span class="a">#ifdef DEBUG_LOG_GC</span>
+  <span class="i">printf</span>(<span class="s">&quot;%p blacken &quot;</span>, (<span class="t">void</span>*)<span class="i">object</span>);
+  <span class="i">printValue</span>(<span class="a">OBJ_VAL</span>(<span class="i">object</span>));
+  <span class="i">printf</span>(<span class="s">&quot;</span><span class="e">\n</span><span class="s">&quot;</span>);
+<span class="a">#endif</span>
+
+</pre><pre class="insert-after">  switch (object-&gt;type) {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>blackenObject</em>() 内</div>
+
+<p>这样我们就能看着追踪在对象图里一层层渗透。说到这个，注意我说的是<strong>图</strong>。对象之间的引用是
+有向的，但这并不意味着它们是**无环的！**完全可能出现对象构成的环。那种情况下我们得确保回收器
+不会陷入死循环，因为它会不断把同一批对象重新加进灰栈。</p>
+<p>修法很简单。</p>
+<div class="codehilite"><pre class="insert-before">  if (object == NULL) return;
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>markObject</em>() 内</div>
+<pre class="insert">  <span class="k">if</span> (<span class="i">object</span>-&gt;<span class="i">isMarked</span>) <span class="k">return</span>;
+
+</pre><pre class="insert-after">#ifdef DEBUG_LOG_GC
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>markObject</em>() 内</div>
+
+<p>如果对象已经被标记过，我们就不再标记它，也就不把它加进灰栈。这确保了一个已经变灰的对象不会被
+重复添加，也确保一个黑色对象不会被不知不觉地变回灰色。换句话说，它让波前只穿过白色对象继续
+往前推进。</p>
+<h2><a href="#清除未使用的对象" id="清除未使用的对象"><small>26&#8202;.&#8202;5</small>清除未使用的对象</a></h2>
+<p>当 <code>traceReferences()</code> 里的循环退出时，我们已经处理完了所有够得着的对象。灰栈空了，堆里每个
+对象要么是黑色要么是白色。黑色对象是可达的，我们想留着它们。任何仍然是白色的对象从没被追踪
+碰到，因此就是垃圾。剩下的就是回收它们。</p>
+<div class="codehilite"><pre class="insert-before">  traceReferences();
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">  <span class="i">sweep</span>();
+</pre><pre class="insert-after">
+
+#ifdef DEBUG_LOG_GC
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>所有逻辑都在一个函数里。</p>
+<div class="codehilite"><div class="source-file"><em>memory.c</em><br>
+加在 <em>traceReferences</em>() 之后</div>
+<pre><span class="k">static</span> <span class="t">void</span> <span class="i">sweep</span>() {
+  <span class="t">Obj</span>* <span class="i">previous</span> = <span class="a">NULL</span>;
+  <span class="t">Obj</span>* <span class="i">object</span> = <span class="i">vm</span>.<span class="i">objects</span>;
+  <span class="k">while</span> (<span class="i">object</span> != <span class="a">NULL</span>) {
+    <span class="k">if</span> (<span class="i">object</span>-&gt;<span class="i">isMarked</span>) {
+      <span class="i">previous</span> = <span class="i">object</span>;
+      <span class="i">object</span> = <span class="i">object</span>-&gt;<span class="i">next</span>;
+    } <span class="k">else</span> {
+      <span class="t">Obj</span>* <span class="i">unreached</span> = <span class="i">object</span>;
+      <span class="i">object</span> = <span class="i">object</span>-&gt;<span class="i">next</span>;
+      <span class="k">if</span> (<span class="i">previous</span> != <span class="a">NULL</span>) {
+        <span class="i">previous</span>-&gt;<span class="i">next</span> = <span class="i">object</span>;
+      } <span class="k">else</span> {
+        <span class="i">vm</span>.<span class="i">objects</span> = <span class="i">object</span>;
+      }
+
+      <span class="i">freeObject</span>(<span class="i">unreached</span>);
+    }
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 加在 <em>traceReferences</em>() 之后</div>
+
+<p>我知道那算是相当多的代码和指针花招，但一旦你把它想通，其实没什么。外层 <code>while</code> 循环遍历堆里
+每个对象组成的链表，检查它们的标记位。如果对象被标记了（黑色），我们就跳过它继续往下。如果
+它没被标记（白色），我们把它从链表里摘下来，用我们之前写的 <code>freeObject()</code> 函数释放。</p><img src="image/garbage-collection/unlink.png" alt="一个装满比特位的回收桶。" />
+<p>这里其余大部分代码都在应付「从单链表里删节点很麻烦」这件事。我们必须一直记住前一个节点，
+才能摘掉它的 next 指针，还得处理「我们正在释放第一个节点」这个边界情况。不过除此之外就相当
+简单了——把链表里所有没设标记位的节点删掉。</p>
+<p>还有一点小补充：</p>
+<div class="codehilite"><pre class="insert-before">    if (object-&gt;isMarked) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>sweep</em>() 内</div>
+<pre class="insert">      <span class="i">object</span>-&gt;<span class="i">isMarked</span> = <span class="k">false</span>;
+</pre><pre class="insert-after">      previous = object;
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>sweep</em>() 内</div>
+
+<p><code>sweep()</code> 完成后，剩下唯一还在的就是那些标记位设着的活着的黑色对象。这没问题，但当<strong>下一个</strong>
+回收周期开始时，我们需要每个对象都是白色。所以每当我们遇到一个黑色对象，就顺手把那个位清掉，
+以备下一次。</p>
+<h3><a href="#弱引用与字符串池" id="弱引用与字符串池"><small>26&#8202;.&#8202;5&#8202;.&#8202;1</small>弱引用与字符串池</a></h3>
+<p>我们的回收工作几乎完成了。VM 里还剩一个角落对内存有着不寻常的要求。回想一下，我们给 clox
+加字符串时让 VM 把它们全部驻留。这意味着 VM 有一张哈希表，里面装着指向堆里每一个字符串的
+指针。VM 用它来给字符串去重。</p>
+<p>在标记阶段，我们刻意<strong>没有</strong>把 VM 的字符串表当成根的来源。要是我们那么做了，就<strong>永远</strong>不会有任何<span name="intern">字符串</span>被回收。字符串表会一直长大，一个字节都不还给操作系统。那会很糟。</p>
+<aside name="intern">
+<p>这可能是个真问题。Java 并不驻留<strong>所有</strong>字符串，但它确实会驻留字符串<strong>字面量</strong>。它还提供了一
+个 API 往字符串表里加字符串。很多年里，那张表的容量是固定的，加进去的字符串永远无法移除。
+如果用户不留意自己使用 <code>String.intern()</code> 的方式，就可能耗尽内存并崩溃。</p>
+<p>Ruby 多年来也有类似的问题：符号——被驻留的、类字符串的值——不会被垃圾回收。两者后来都让 GC
+能够回收这些字符串了。</p>
+</aside>
+<p>与此同时，如果我们<strong>确实</strong>让 GC 释放字符串，那么 VM 的字符串表里就会留下一堆指向已释放内存的
+悬垂指针。那会更糟。</p>
+<p>字符串表很特殊，需要特殊支持。特别地，它需要一种特殊的引用。这张表应该能够引用一个字符串，
+但这条链接在判定可达性时不该被当作根。这意味着被引用的对象是可以被释放的。那种情况下这个悬垂
+引用也必须一并修好，有点像一个会自我清除的魔法指针。这一套语义出现得足够频繁，以至于它有了
+名字：<a href="https://en.wikipedia.org/wiki/Weak_reference"><strong>弱引用</strong></a>。</p>
+<p>我们已经隐式实现了字符串表那套独特行为的一半——因为我们在标记时<strong>不</strong>遍历它。这意味着它不会
+强迫字符串保持可达。剩下的一半是清掉那些已被释放字符串的所有悬垂指针。</p>
+<p>要移除对不可达字符串的引用，我们得知道哪些字符串<strong>是</strong>不可达的。而这要到标记阶段结束才知道。
+但我们又不能等到清除阶段做完，因为那时对象——以及它们的标记位——都已经不存在、没法检查了。
+所以正确的时机恰好是标记与清除两个阶段之间。</p>
+<div class="codehilite"><pre class="insert-before">  traceReferences();
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">  <span class="i">tableRemoveWhite</span>(&amp;<span class="i">vm</span>.<span class="i">strings</span>);
+</pre><pre class="insert-after">  sweep();
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>删除即将被清除的字符串，这个逻辑实现在「table」模块的一个新函数里。</p>
+<div class="codehilite"><pre class="insert-before">ObjString* tableFindString(Table* table, const char* chars,
+                           int length, uint32_t hash);
+</pre><div class="source-file"><em>table.h</em><br>
+加在 <em>tableFindString</em>() 之后</div>
+<pre class="insert">
+
+<span class="t">void</span> <span class="i">tableRemoveWhite</span>(<span class="t">Table</span>* <span class="i">table</span>);
+</pre><pre class="insert-after">void markTable(Table* table);
+
+</pre></div>
+<div class="source-file-narrow"><em>table.h</em>, 加在 <em>tableFindString</em>() 之后</div>
+
+<p>实现在这里：</p>
+<div class="codehilite"><div class="source-file"><em>table.c</em><br>
+加在 <em>tableFindString</em>() 之后</div>
+<pre><span class="t">void</span> <span class="i">tableRemoveWhite</span>(<span class="t">Table</span>* <span class="i">table</span>) {
+  <span class="k">for</span> (<span class="t">int</span> <span class="i">i</span> = <span class="n">0</span>; <span class="i">i</span> &lt; <span class="i">table</span>-&gt;<span class="i">capacity</span>; <span class="i">i</span>++) {
+    <span class="t">Entry</span>* <span class="i">entry</span> = &amp;<span class="i">table</span>-&gt;<span class="i">entries</span>[<span class="i">i</span>];
+    <span class="k">if</span> (<span class="i">entry</span>-&gt;<span class="i">key</span> != <span class="a">NULL</span> &amp;&amp; !<span class="i">entry</span>-&gt;<span class="i">key</span>-&gt;<span class="i">obj</span>.<span class="i">isMarked</span>) {
+      <span class="i">tableDelete</span>(<span class="i">table</span>, <span class="i">entry</span>-&gt;<span class="i">key</span>);
+    }
+  }
+}
+</pre></div>
+<div class="source-file-narrow"><em>table.c</em>, 加在 <em>tableFindString</em>() 之后</div>
+
+<p>我们遍历表里每一个条目。字符串驻留表只用每个条目的键——它基本上是一张哈希<strong>集合</strong>而不是哈希
+<strong>映射</strong>。如果键字符串对象的标记位没有设上，那它就是一个离被扫走只差一步的白对象。我们先把它
+从哈希表里删掉，从而确保不会看到任何悬垂指针。</p>
+<h2><a href="#何时回收" id="何时回收"><small>26&#8202;.&#8202;6</small>何时回收</a></h2>
+<p>我们现在有了一个功能完整的标记-清除垃圾回收器。压力测试标志打开时，它老是被调用，再加上
+日志也打开，我们就能看着它干活，确认它确实在回收内存。但压力测试标志一关，它就完全不运行。
+是时候决定在正常的程序执行中该何时调用回收器了。</p>
+<p>就我能分辨的而言，这个问题在文献里回答得很糟。垃圾回收器刚被发明出来那会儿，计算机只有很少
+一点固定内存。早期的许多 GC 论文都假设你预留几千个字的内存——换句话说就是绝大部分——然后一
+用完就叫回收器。简单。</p>
+<p>现代机器有好几 G 的物理内存，藏在操作系统更大的虚拟内存抽象背后，而这块虚拟内存要和一大堆
+其他程序共享，大家都在争抢自己那份。操作系统会允许你的程序想申请多少就申请多少，然后在物理
+内存满了的时候从磁盘换页进出。你永远不会真正「用完」内存，你只是变得越来越慢。</p>
+<h3><a href="#延迟与吞吐量" id="延迟与吞吐量"><small>26&#8202;.&#8202;6&#8202;.&#8202;1</small>延迟与吞吐量</a></h3>
+<p>再等到「不得不」时才去跑 GC 已经没有意义了，所以我们需要一套更精细的时机策略。为了更精确地
+推理这件事，是时候介绍衡量内存管理器性能时用到的两个基本数字了：<strong>吞吐量</strong>和<strong>延迟</strong>。</p>
+<p>相比显式、由用户手写的释放，每一门托管语言都要付出性能代价。真正花在释放内存上的时间是
+一样的，但 GC 还要花周期去弄清楚<strong>哪些</strong>内存该释放。那是<strong>没有</strong>花在跑用户代码、干有用工作上的
+时间。在我们的实现里，那就是整个标记阶段。一个精巧的垃圾回收器的目标就是把这部分开销最小化。</p>
+<p>有两个关键指标能帮我们更好地理解这份代价：</p>
+<ul>
+<li>
+<p><strong>吞吐量</strong> 是花在跑用户代码上的时间占比，与花在垃圾回收工作上的时间之比。假设你跑一个
+clox 程序十秒，其中有一秒花在 <code>collectGarbage()</code> 里。那意味着吞吐量是 90%——90% 的时间在
+跑程序，10% 花在 GC 开销上。</p>
+<p>吞吐量是最基本的度量，因为它跟踪了回收开销的总成本。其他条件相同时，你想要吞吐量最大化。
+在本章之前，clox 压根没有 GC，因此吞吐量是 <span name="hundred">100%</span>。这 难超越。当然，代价是用户的程序只要跑得够久，就有可能耗尽内存而崩溃。你可以看作 GC 的目标
+就是修掉那个「小毛病」，同时尽可能少牺牲吞吐量。</p>
+<aside name="hundred">
+<p>嗯，不<strong>完全</strong>是 100%。它确实还是把分配出来的对象放进了一个链表，所以设置那些指针还是有
+一点微不足道的开销。</p>
+</aside></li>
+<li>
+<p><strong>延迟</strong>指用户程序被完全暂停、垃圾回收连续运行的最长时间。它衡量的是
+回收器有多「成块」。延迟是完全不同于吞吐量的另一个指标。</p>
+<p>考虑同一个 clox 程序的两次运行，都花十秒。第一次运行里 GC 启动了一次，在一次大动作里
+实实在在地花了一秒在 <code>collectGarbage()</code> 上。第二次运行里 GC 被调用了五次，每次五分之一秒。
+花在回收上的<strong>总</strong>时间仍然是一秒，所以两种情况下吞吐量都是 90%。但第二次运行里，延迟只有
+五分之一秒，比第一次小了五倍。</p>
+<p><span name="latency"></span></p><img src="image/garbage-collection/latency-throughput.png" alt="一根代表执行时间的条，内部分成运行用户代码和运行 GC 的若干片。最大的 GC 片是延迟。所有用户代码片加起来是吞吐量。" />
+<aside name="latency">
+<p>那根条代表一个程序的执行，被分成运行用户代码的时间和待在 GC 里的时间。最大的单片 GC 时间
+就是延迟。所有用户代码片加起来就是吞吐量。</p>
+</aside>
+<p>如果你喜欢类比，就想象你的程序是一家面包店，向顾客卖刚出炉的新鲜面包。吞吐量是你一天里能给
+顾客端上的温热酥脆法棍的总数。延迟是最不走运的那位顾客在轮到被服务之前要排队等多久。</p>
+<p><span name="dishwasher">运行</span>垃圾回收器，就像临时关掉面包店，把所有餐具都过一遍，
+把脏的和干净的分开，然后洗掉用过的。在我们的类比里，我们没有专职洗碗工，所以这件事进行
+期间没人烘焙。面包师在洗碗。</p>
+<aside name="dishwasher">
+<p>如果每个人代表一个线程，那一个显而易见的优化就是让单独的线程跑垃圾回收，也就是得到一个
+<strong>并发垃圾回收器</strong>。换句话说就是雇几个洗碗工，别人烤面包的时候他们去清洗。这正是非常精巧的
+GC 的工作方式，因为这确实让面包师——工作线程——几乎不被打断地继续跑用户代码。</p>
+<p>不过这需要协调。你不希望一个洗碗工从面包师手里抢走一个碗！这种协调会增加开销和大量复杂度。
+并发回收器很快，但很难正确实现。</p><img src="image/garbage-collection/baguette.png" class="above" alt="一根法棍。" />
+</aside>
+<p>一天少卖面包是坏事，让任何一位顾客坐着等你去洗完全部餐具也是坏事。目标是最大化吞吐量、
+最小化延迟，但即使在一家面包店里也没有免费的午餐。垃圾回收器在「牺牲多少吞吐量」和
+「容忍多少延迟」之间做出不同的取舍。</p>
+<p>能做这些取舍很有用，因为不同的用户程序有不同的需求。一个通宵跑的批处理作业，要从一 TB 的
+数据里生成一份报告，它只需要尽可能快地多干活。吞吐量至高无上。与此同时，一个跑在用户手机上
+的 app 需要对用户输入永远立刻响应，好让在屏幕上拖动顺滑得像<span name="butter">黄油</span>一样。这个 app 不能在
+GC 拖着那堆脏活的那几秒里冻住。</p>
+<aside name="butter">
+<p>显然这个面包房的类比已经钻进我脑子里了。</p>
+</aside>
+<p>作为垃圾回收器的作者，你可以通过选择回收算法来控制吞吐量与延迟之间的一部分取舍。但即便在
+同一个算法内部，我们对回收器运行的<strong>频率</strong>也有很多控制权。</p>
+<p>我们的回收器是一个<span name="incremental"><strong>全停顿式 GC</strong></span>，意思是用户程序会被
+暂停，直到整个垃圾回收过程完成。如果我们隔很久才跑一次回收器，就会积累大量死对象。那会
+导致回收器运行时出现一段很长的暂停，从而带来高延迟。所以，显然我们希望非常频繁地跑回收器。</p>
+<aside name="incremental">
+<p>相对地，<strong>增量式垃圾回收器</strong>可以做一小会儿回收，然后跑一会儿用户代码，再回收一点，如此
+往复。</p>
+</aside>
+<p>但每次回收器运行时，它都要花些时间去访问活对象。那并不真的<strong>做</strong>任何有用的事（除了确保
+它们不会被错误地删掉）。访问活对象的时间既是不释放内存的时间，也是不跑用户代码的时间。
+如果你<strong>非常</strong>频繁地跑 GC，用户程序就来不及生成新垃圾给 VM 回收。VM 会把全部时间执拗地花在
+一遍遍重访同一批活对象上，吞吐量就会受损。所以，显然我们希望真正<strong>不</strong>频繁地跑回收器。</p>
+<p>事实上我们想要的是介于两者之间，而回收器运行的频率就是我们在延迟与吞吐量之间做取舍的
+主要旋钮之一。</p>
+</li>
+</ul>
+<h3><a href="#自适应堆" id="自适应堆"><small>26&#8202;.&#8202;6&#8202;.&#8202;2</small>自适应堆</a></h3>
+<p>我们希望 GC 运行得足够频繁以最小化延迟，又足够不频繁以维持不错的吞吐量。但当我们既不知道
+用户程序需要多少内存、也不知道它多久分配一次时，怎么在这两者之间找到平衡？我们可以把这个问题
+甩给用户，暴露 GC 调优参数逼他们自己选。很多 VM 就是这么做的。但如果我们这些 GC 作者都不
+知道怎么调好，用户多半也不知道。他们应该得到一个合理的默认行为。</p>
+<p>我跟你说实话，这不是我的专长。我跟若干职业 GC 黑客聊过——这是足以支撑起一整份职业的东西——
+也读了不少文献，而我得到的全部答案都是……含糊。最后挑的策略很常见、相当简单，而且（希望！）
+对大多数用途来说够用。</p>
+<p>思路是让回收频率根据堆的存活内存量自动调整。我们跟踪 VM 已分配的托管内存总字节数。当它超过
+某个阈值时，就触发一次 GC。回收之后，我们记下还剩下多少字节内存——有多少<strong>没有</strong>被释放。然后
+把阈值调整到比那个值更大的数。</p>
+<p>结果是：随着存活内存增加，我们降低回收频率，以免因为重访不断增长的那堆活对象而牺牲吞吐量。
+随着存活内存下降，我们提高回收频率，好让等待时间不至于太久而损失太多延迟。</p>
+<p>实现需要在 VM 里加两个新的记账字段。</p>
+<div class="codehilite"><pre class="insert-before">  ObjUpvalue* openUpvalues;
+</pre><div class="source-file"><em>vm.h</em><br>
+在结构体 <em>VM</em> 内</div>
+<pre class="insert">
+
+  <span class="t">size_t</span> <span class="i">bytesAllocated</span>;
+  <span class="t">size_t</span> <span class="i">nextGC</span>;
+</pre><pre class="insert-after">  Obj* objects;
+</pre></div>
+<div class="source-file-narrow"><em>vm.h</em>, 在结构体 <em>VM</em> 内</div>
+
+<p>第一个是 VM 已分配托管内存字节数的累计值。第二个是触发下一次回收的阈值。VM 启动时我们把它们
+初始化好。</p>
+<div class="codehilite"><pre class="insert-before">  vm.objects = NULL;
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>initVM</em>() 内</div>
+<pre class="insert">  <span class="i">vm</span>.<span class="i">bytesAllocated</span> = <span class="n">0</span>;
+  <span class="i">vm</span>.<span class="i">nextGC</span> = <span class="n">1024</span> * <span class="n">1024</span>;
+</pre><pre class="insert-after">
+
+  vm.grayCount = 0;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>initVM</em>() 内</div>
+
+<p>这里的初始阈值是<span name="lab">任意的</span>。它跟我们给各种动态数组挑的初始容量差不多。目标是既<strong>太</strong>快地触发
+最初几次 GC，也不要等太久。如果我们有一些真实世界的 Lox 程序，就可以做性能剖析来调这个值。
+但既然手上只有玩具程序，我就随便挑了个数。</p>
+<aside name="lab">
+<p>学习垃圾回收器的一个难点，是在一间孤立实验室里<strong>非常</strong>难发现最佳实践。除非你把回收器拿
+到它真正针对的那种又大又乱的真实世界程序上跑，你根本看不出它实际表现如何。这就像调校一辆
+拉力赛车——你得把它开到赛道上。</p>
+</aside>
+<p>每当我们分配或释放一些内存，就按那个差值调整计数器。</p>
+<div class="codehilite"><pre class="insert-before">void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>reallocate</em>() 内</div>
+<pre class="insert">  <span class="i">vm</span>.<span class="i">bytesAllocated</span> += <span class="i">newSize</span> - <span class="i">oldSize</span>;
+</pre><pre class="insert-after">  if (newSize &gt; oldSize) {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>reallocate</em>() 内</div>
+
+<p>当总量越过上限时，我们就跑回收器。</p>
+<div class="codehilite"><pre class="insert-before">    collectGarbage();
+#endif
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>reallocate</em>() 内</div>
+<pre class="insert">
+
+    <span class="k">if</span> (<span class="i">vm</span>.<span class="i">bytesAllocated</span> &gt; <span class="i">vm</span>.<span class="i">nextGC</span>) {
+      <span class="i">collectGarbage</span>();
+    }
+</pre><pre class="insert-after">  }
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>reallocate</em>() 内</div>
+
+<p>现在，终于，我们这个垃圾回收器在用户没打开隐藏诊断标志跑程序时也会真的干点事了。清除阶段
+通过调用 <code>reallocate()</code> 来释放对象，这会降低 <code>bytesAllocated</code> 的值，所以回收一结束，我们
+就知道还剩多少活着的字节。我们据此调整下一次 GC 的阈值。</p>
+<div class="codehilite"><pre class="insert-before">  sweep();
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">vm</span>.<span class="i">nextGC</span> = <span class="i">vm</span>.<span class="i">bytesAllocated</span> * <span class="a">GC_HEAP_GROW_FACTOR</span>;
+</pre><pre class="insert-after">
+
+#ifdef DEBUG_LOG_GC
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>阈值是堆大小的一个倍数。这样一来，随着程序使用的内存增长，阈值就往外挪，以限制重访更大存活
+集合所花的总时间。和本章里其他数字一样，这个缩放因子基本上是任意的。</p>
+<div class="codehilite"><pre class="insert-before">#endif
+</pre><div class="source-file"><em>memory.c</em></div>
+<pre class="insert">
+
+<span class="a">#define GC_HEAP_GROW_FACTOR 2</span>
+</pre><pre class="insert-after">
+
+void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em></div>
+
+<p>等你的实现里有了真实程序可以拿来做基准时，你会想调调这个。现在我们至少可以把一些统计信息
+记录下来。我们在回收之前捕获堆的大小。</p>
+<div class="codehilite"><pre class="insert-before">  printf(&quot;-- gc begin\n&quot;);
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">  <span class="t">size_t</span> <span class="i">before</span> = <span class="i">vm</span>.<span class="i">bytesAllocated</span>;
+</pre><pre class="insert-after">#endif
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>然后在结束时把结果打印出来。</p>
+<div class="codehilite"><pre class="insert-before">  printf(&quot;-- gc end\n&quot;);
+</pre><div class="source-file"><em>memory.c</em><br>
+在 <em>collectGarbage</em>() 内</div>
+<pre class="insert">  <span class="i">printf</span>(<span class="s">&quot;   collected %zu bytes (from %zu to %zu) next at %zu</span><span class="e">\n</span><span class="s">&quot;</span>,
+         <span class="i">before</span> - <span class="i">vm</span>.<span class="i">bytesAllocated</span>, <span class="i">before</span>, <span class="i">vm</span>.<span class="i">bytesAllocated</span>,
+         <span class="i">vm</span>.<span class="i">nextGC</span>);
+</pre><pre class="insert-after">#endif
+</pre></div>
+<div class="source-file-narrow"><em>memory.c</em>, 在 <em>collectGarbage</em>() 内</div>
+
+<p>这样我们就能看出垃圾回收器运行时干成了多少事。</p>
+<h2><a href="#垃圾回收的-bug" id="垃圾回收的-bug"><small>26&#8202;.&#8202;7</small>垃圾回收的 bug</a></h2>
+<p>理论上我们现在全都完成了。我们有了 GC。它周期性地启动、回收它能回收的，剩下的留下。要这是
+一本典型教科书，我们就会掸掸手上的灰，沐浴在我们亲手造起的这座无瑕大理石建筑柔和的光辉里。</p>
+<p>但我想教给你的不只是编程语言的理论，还有时而不适的真相。我要翻起一块腐烂的木头，让你看看
+底下的臭虫，而垃圾回收器的 bug 确实是这世上最恶心的几种无脊椎动物之一。</p>
+<p>回收器的职责是释放死对象、保住活对象。两个方向都很容易犯错。如果 VM 没能释放不需要的对象，
+它就会慢慢泄漏内存。如果它释放了一个正在使用的对象，用户的程序就可能访问到非法内存。这些故障
+往往不会立刻引发崩溃，这让我们很难倒溯时间去找到那个 bug。</p>
+<p>更麻烦的是，我们不知道回收器什么时候会运行。任何最终会分配一些内存的调用，都是 VM 里一个
+可能发生回收的地方。这就像抢椅子游戏。GC 随时可能停掉音乐。每一个我们想留住的、分配在堆
+上的对象，都得在被清除阶段踢出局之前迅速找到一把椅子——被标记为根，或作为引用存在别的某个
+对象里。</p>
+<p>VM 后来用到某个它自己都看不见的对象，怎么可能？VM 又怎么找到它？最常见的答案是通过存在 C 栈
+上某个局部变量里的指针。GC 会走 <strong>VM 的</strong>值栈和 CallFrame 栈，但 C 栈对它来说是<span name="c">不可见的</span>。</p>
+<aside name="c">
+<p>我们的 GC 找不到 C 栈里的地址，但很多 GC 可以。保守垃圾回收器会把整个内存都翻一遍，包括原生
+栈。这一类里最有名的是 <a href="https://en.wikipedia.org/wiki/Boehm_garbage_collector"><strong>Boehm–Demers–Weiser 垃圾回收器</strong></a>，通常就叫「Boehm 回收器」。
+（在 CS 里出名最快的路径，就是取一个字母顺序靠前的姓，这样它在排序后的名单里会排在最前面。）</p>
+<p>连很多精确式 GC 也会走 C 栈。即便如此，它们也必须小心那些只存在于 <strong>CPU 寄存器</strong>里的、
+指向活对象的指针。</p>
+</aside>
+<p>在前面的章节里，我们写过一些看似无意义的代码：把一个对象压进 VM 的值栈，做一点点工作，然后
+马上又把它弹出来。大多数时候我都说这是为了 GC。现在你知道为什么了。压栈与弹栈之间的代码可能
+分配内存，因而可能触发 GC。我们必须确保那个对象待在值栈上，好让回收器的标记阶段能找到它并
+让它活着。</p>
+<p>我是在把 clox 的整个实现拆成章节、写正文之前就全部写完的，所以我有充足的时间把这些边角都
+找出来，并把其中大部分 bug 冲刷掉。本章开头放进去的压力测试代码加上一套相当不错的测试用例，
+帮了大忙。</p>
+<p>但我只修好了其中的<strong>大部分</strong>。我故意留下了一两个，因为我想让你体会一下在野外遇到这些 bug 是
+什么滋味。如果你打开压力测试标志、跑几个玩具 Lox 程序，多半能碰上几个。试试看，<strong>看看你自己
+能不能修掉几个</strong>。</p>
+<h3><a href="#往常量表里添加东西" id="往常量表里添加东西"><small>26&#8202;.&#8202;7&#8202;.&#8202;1</small>往常量表里添加东西</a></h3>
+<p>你很可能会撞上第一个 bug。每个代码块所拥有的常量表是个动态数组。当编译器往当前函数的表里添加
+一个新常量时，那个数组可能需要增长。而那个常量本身也可能是某个堆分配的对象，比如字符串或者
+嵌套函数。</p>
+<p>正在被加进常量表的那个新对象，会被传给 <code>addConstant()</code>。在那一刻，这个对象只能在 C 栈上
+那个函数的参数里找到。那个函数把对象追加到常量表。如果表容量不够、需要增长，它会调用
+<code>reallocate()</code>。这又触发一次 GC，而 GC 没能标记这个新的常量对象，于是在我们来得及把它加进
+表之前就把它扫走了。崩溃。</p>
+<p>修法跟你在别处见过的一样，是把这个常量临时压栈。</p>
+<div class="codehilite"><pre class="insert-before">int addConstant(Chunk* chunk, Value value) {
+</pre><div class="source-file"><em>chunk.c</em><br>
+在 <em>addConstant</em>() 内</div>
+<pre class="insert">  <span class="i">push</span>(<span class="i">value</span>);
+</pre><pre class="insert-after">  writeValueArray(&amp;chunk-&gt;constants, value);
+</pre></div>
+<div class="source-file-narrow"><em>chunk.c</em>, 在 <em>addConstant</em>() 内</div>
+
+<p>一旦常量表里有了这个对象，我们再把它从栈上弹出来。</p>
+<div class="codehilite"><pre class="insert-before">  writeValueArray(&amp;chunk-&gt;constants, value);
+</pre><div class="source-file"><em>chunk.c</em><br>
+在 <em>addConstant</em>() 内</div>
+<pre class="insert">  <span class="i">pop</span>();
+</pre><pre class="insert-after">  return chunk-&gt;constants.count - 1;
+</pre></div>
+<div class="source-file-narrow"><em>chunk.c</em>, 在 <em>addConstant</em>() 内</div>
+
+<p>当 GC 标记根时，它会走一遍编译器链并标记其中每个编译器的函数，所以这个新常量现在是可达的了。
+我们确实需要一个 include，才能从「chunk」模块调进 VM。</p>
+<div class="codehilite"><pre class="insert-before">#include &quot;memory.h&quot;
+</pre><div class="source-file"><em>chunk.c</em></div>
+<pre class="insert"><span class="a">#include &quot;vm.h&quot;</span>
+</pre><pre class="insert-after">
+
+void initChunk(Chunk* chunk) {
+</pre></div>
+<div class="source-file-narrow"><em>chunk.c</em></div>
+
+<h3><a href="#驻留字符串" id="驻留字符串"><small>26&#8202;.&#8202;7&#8202;.&#8202;2</small>驻留字符串</a></h3>
+<p>这里还有一个类似的。clox 里所有字符串都是驻留的，所以每当我们创建一个新字符串，也会把它
+加进驻留表。你能猜到这要出问题。既然这个字符串是全新的，它在任何地方都不可达。而扩大字符串池
+可能触发一次回收。于是我们照旧先把字符串暂存在栈上。</p>
+<div class="codehilite"><pre class="insert-before">  string-&gt;chars = chars;
+  string-&gt;hash = hash;
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>allocateString</em>() 内</div>
+<pre class="insert">
+
+  <span class="i">push</span>(<span class="a">OBJ_VAL</span>(<span class="i">string</span>));
+</pre><pre class="insert-after">  tableSet(&amp;vm.strings, string, NIL_VAL);
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>allocateString</em>() 内</div>
+
+<p>等它安全地落进表里之后，再把它弹出来。</p>
+<div class="codehilite"><pre class="insert-before">  tableSet(&amp;vm.strings, string, NIL_VAL);
+</pre><div class="source-file"><em>object.c</em><br>
+在 <em>allocateString</em>() 内</div>
+<pre class="insert">  <span class="i">pop</span>();
+
+</pre><pre class="insert-after">  return string;
+}
+</pre></div>
+<div class="source-file-narrow"><em>object.c</em>, 在 <em>allocateString</em>() 内</div>
+
+<p>这保证了在表被扩容期间那个字符串是安全的。一旦熬过这一关，<code>allocateString()</code> 会把它返回给
+某个调用者，由那个调用者负责确保在下一次堆分配发生之前这个字符串仍然可达。</p>
+<h3><a href="#拼接字符串" id="拼接字符串"><small>26&#8202;.&#8202;7&#8202;.&#8202;3</small>拼接字符串</a></h3>
+<p>最后一个例子：在解释器那边，<code>OP_ADD</code> 指令可以用来拼接两个字符串。和处理数字一样，它把两个
+操作数从栈上弹下来、算出结果、再把这个新值压回栈上。对数字来说这完全安全。</p>
+<p>但拼接两个字符串需要在堆上分配一个新的字符数组，这又可能触发一次 GC。到那一步我们的操作数
+字符串已经被弹下来了，所以它们可能被标记阶段漏掉然后扫走。我们不急着把它们弹下栈，而是 peek
+它们。</p>
+<div class="codehilite"><pre class="insert-before">static void concatenate() {
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>concatenate</em>() 内<br>
+替换 2 行</div>
+<pre class="insert">  <span class="t">ObjString</span>* <span class="i">b</span> = <span class="a">AS_STRING</span>(<span class="i">peek</span>(<span class="n">0</span>));
+  <span class="t">ObjString</span>* <span class="i">a</span> = <span class="a">AS_STRING</span>(<span class="i">peek</span>(<span class="n">1</span>));
+</pre><pre class="insert-after">
+
+  int length = a-&gt;length + b-&gt;length;
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>concatenate</em>() 内, 替换 2 行</div>
+
+<p>这样，当我们创建结果字符串时，它们还挂在栈上。等那件事做完，我们就可以安全地把它们弹下来，
+再用结果替换掉它们。</p>
+<div class="codehilite"><pre class="insert-before">  ObjString* result = takeString(chars, length);
+</pre><div class="source-file"><em>vm.c</em><br>
+在 <em>concatenate</em>() 内</div>
+<pre class="insert">  <span class="i">pop</span>();
+  <span class="i">pop</span>();
+</pre><pre class="insert-after">  push(OBJ_VAL(result));
+</pre></div>
+<div class="source-file-narrow"><em>vm.c</em>, 在 <em>concatenate</em>() 内</div>
+
+<p>这些都相当容易，尤其是因为我<strong>指出</strong>了修法在哪儿。实际中，<strong>找到</strong>它们才是难的部分。你看到的
+只是一个<strong>本该</strong>在那儿却不在那儿的对象。这跟别的那种「在找<strong>导致</strong>某个问题的代码」的 bug 不一样。
+你要找的是代码的<strong>缺失</strong>——那段本该<strong>防止</strong>问题却没有的代码——这难找得多。</p>
+<p>不过至少现在你可以放心了。据我所知，我们已经找齐了 clox 里所有的回收 bug，而现在我们有了一个
+能工作、健壮、自我调谐的标记-清除垃圾回收器。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>现在每个对象开头的 Obj 头部结构有三个字段：<code>type</code>、<code>isMarked</code> 和 <code>next</code>。它们占多少
+内存（在你的机器上）？你能想出更紧凑的方案吗？这样做有运行时代价吗？</p>
+</li>
+<li>
+<p>清除阶段遍历一个活对象时，会清掉它的 <code>isMarked</code> 字段，为下一个回收周期做准备。你能想出
+更高效的做法吗？</p>
+</li>
+<li>
+<p>标记-清除只是众多垃圾回收算法中的一种。通过替换或增强当前的回收器，去探索其他算法。
+值得考虑的候选有引用计数、Cheney 算法，或者 Lisp 2 的标记-整理算法。</p>
+</li>
+</ol>
+</div>
+<div class="design-note">
+<h2><a href="#design-note" id="design-note">设计说明：分代回收器</a></h2>
+<p>一个回收器要是花很长时间重访那些还活着的对象，就会损失吞吐量。但如果它躲开回收、攒下一大堆
+垃圾要蹚过去，又会增加延迟。要是有办法告诉我们哪些对象大概会长寿、哪些不会就好了。那样 GC
+就能少去重访长寿对象、更频繁地清理短命对象。</p>
+<p>结果还真有这么一种。很多年前，GC 研究者收集了真实世界运行程序中对象存活期的度量数据。他们
+跟踪每一个对象从分配到最终不再需要的过程，然后绘制出对象通常能活多久。</p>
+<p>他们发现了一个东西，称之为<strong>分代假设</strong>，或者用不那么客气的说法叫<strong>婴儿死亡率</strong>。他们的观察
+是：大多数对象寿命很短，但一旦它们活过某个年纪，就会相当长时间地留在那里。一个对象<strong>已经</strong>活
+得越久，它就很可能<strong>继续</strong>活得更久。这个观察很有力量，因为它给了他们一个抓手，把对象划分成
+从频繁回收中获益的群体和不获益的群体。</p>
+<p>他们设计出了一种叫<strong>分代垃圾回收</strong>的技术。它是这样工作的：每分配一个新对象，它就进入堆里
+一个特殊的、相对较小的区域，叫做「苗圃」。由于对象往往英年早逝，垃圾回收器会<span name="nursery">频繁</span>地对仅仅这个区域做回收。</p>
+<aside name="nursery">
+<p>苗圃通常也是用复制式回收器来管理的，它在分配和释放对象上比标记-清除式回收器更快。</p>
+</aside>
+<p>GC 每次扫过苗圃就叫作一个「代」。任何不再需要的对象会被释放。活下来的那些现在被认为老了一代，
+GC 会为每个对象跟踪这件事。如果一个对象熬过了若干代——往往只是一次回收——它就<strong>晋升</strong>了。
+到这一步，它会被从苗圃复制到一个大得多的、给长寿对象用的堆区域里。垃圾回收器也会扫那个区域，
+但频率低得多，因为那些对象很可能还活着。</p>
+<p>分代回收器是实证数据——观察到对象寿命<strong>并非</strong>均匀分布——与巧妙的算法设计的一场漂亮联姻，
+后者正好利用了这个事实。它们在概念上也相当简单。你可以把一个分代回收器想成两个分别调过
+参数的 GC，加上一套把对象从一个搬到另一个的相当简单的策略。</p>
+</div>
+
+<footer>
+<a href="classes-and-instances.html" class="next">
+  下一章：&ldquo;类与实例&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

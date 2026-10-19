@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>导言 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">导言<small>1</small></a></h3>
+
+<ul>
+    <li><a href="#为什么要学这玩意儿？"><small>1.1</small> 为什么要学这玩意儿？</a></li>
+    <li><a href="#本书是怎么组织的"><small>1.2</small> 本书是怎么组织的</a></li>
+    <li><a href="#第一个解释器"><small>1.3</small> 第一个解释器</a></li>
+    <li><a href="#第二个解释器"><small>1.4</small> 第二个解释器</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>名字里能有什么？</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="welcome.html" title="欢迎" class="left">&larr;&nbsp;上一</a>
+    <a href="welcome.html" title="欢迎">&uarr;&nbsp;返回</a>
+    <a href="a-map-of-the-territory.html" title="领域地图" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="welcome.html" title="欢迎" class="prev">←</a>
+<a href="a-map-of-the-territory.html" title="领域地图" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">导言<small>1</small></a></h3>
+
+<ul>
+    <li><a href="#为什么要学这玩意儿？"><small>1.1</small> 为什么要学这玩意儿？</a></li>
+    <li><a href="#本书是怎么组织的"><small>1.2</small> 本书是怎么组织的</a></li>
+    <li><a href="#第一个解释器"><small>1.3</small> 第一个解释器</a></li>
+    <li><a href="#第二个解释器"><small>1.4</small> 第二个解释器</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>名字里能有什么？</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="welcome.html" title="欢迎" class="left">&larr;&nbsp;上一</a>
+    <a href="welcome.html" title="欢迎">&uarr;&nbsp;返回</a>
+    <a href="a-map-of-the-territory.html" title="领域地图" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">1</div>
+  <h1>导言</h1>
+
+<blockquote>
+<p>童话比真实更真：不是因为它们告诉我们龙存在，而是因为它们告诉我们，龙是能被打败的。</p>
+<p><cite>G. K. 切斯特顿，转引自尼尔·盖曼《鬼妈妈》</cite></p>
+</blockquote>
+<p>我们就要一起走这趟了，我真是兴奋得不行。这是一本讲怎么实现编程语言解释器的书。它同时也是
+一本讲怎么设计一门值得去实现的语言的书。它是我当年刚一头扎进语言领域时，希望手边能有的
+那本书，也是我<span name="head">脑子里</span>写了将近十年的那本书。</p>
+<aside name="head">
+<p>献给我的朋友和家人：抱歉，我一直以来都这么心不在焉！</p>
+</aside>
+<p>在这本书里，我们会一步步走过两个完整的解释器，为一门功能齐全的语言各造一个。我假定这是
+你第一次闯进语言的领域，所以造一门完整、能用、够快的语言实现所需要的每一个概念、每一行
+代码，我都会讲到。</p>
+<p>为了在一本书里塞进两套完整实现，又不让它厚得能拿来挡门，这本书的理论比重比别家轻。我们每
+搭起系统的一块，我都会交代它背后的历史脉络和相关概念。我会尽量让你把行话摸熟，这样万一
+哪天你发现自己站在一屋子 PL（编程语言）研究者的<span name="party">鸡尾酒会</span>上，也不至
+于插不上话。</p>
+<aside name="party">
+<p>说来奇怪，这种场面我自己碰上过不止一次。你都想不到其中有些人能喝多少。</p>
+</aside>
+<p>不过我们大半脑子，还是要花在把这门语言跑起来上。这并不是说理论不重要。做语言的时候，能
+精确地、<span name="formal">形式化地</span>推理语法和语义，是一项至关重要的技能。但
+就我个人而言，我最擅长的是动手学。让我趟过一整段一整段的抽象概念，真正把它们吃进肚里，这
+事儿我做不来。可要是我亲手写过一段代码、跑起来、调试过，那我才算<strong>真懂了</strong>。</p>
+<aside name="formal">
+<p>尤其是静态类型系统，需要严密的形式化推理。动手改一个类型系统，手感跟证明一条数学定理
+是一样的。</p>
+<p>事实证明，这里头没有巧合。上世纪上半叶，哈斯凯尔·柯里和威廉·阿尔文·霍华德证明了这两件事
+是同一枚硬币的两面：<a href="https://en.wikipedia.org/wiki/Curry%E2%80%93Howard_correspondence">柯里-霍华德同构</a>。</p>
+</aside>
+<p>这就是我为你设定的目标。我希望你能带着一份扎实的直觉合上这本书：真实的语言是怎么活蹦乱跳
+的。我希望的是，等你以后去读别的、更偏理论的书时，那里的概念能牢牢地刻在你脑子里，全都附着
+在这个摸得着的底子上。</p>
+<h2><a href="#为什么要学这玩意儿？" id="为什么要学这玩意儿？"><small>1&#8202;.&#8202;1</small>为什么要学这玩意儿？</a></h2>
+<p>每本编译器书开头好像都躲不开这么一节。我始终想不明白，编程语言身上到底有什么，能让人怀疑
+起「它到底该不该存在」来。不像鸟类学的书从不为这事操心——它们假定读者本来就爱鸟，张口
+就教。</p>
+<p>不过编程语言还是有点不一样。我想，我们当中任何一个人真能造出一门广泛成功的通用编程语言，
+概率确实不大。全世界那些被广泛使用的语言，它们的设计者挤进一辆大众面包车都装得下——就算
+不把折叠车顶撑开也一样。如果学语言的<strong>唯一</strong>理由是混进那个精英圈子，那这理由确实很难说圆。
+还好，它不止这一个。</p>
+<h3><a href="#小语言无处不在" id="小语言无处不在"><small>1&#8202;.&#8202;1&#8202;.&#8202;1</small>小语言无处不在</a></h3>
+<p>每有一门成功的通用语言，就有一千门成功的小众语言。我们以前管它们叫「小语言」
+（little languages），但术语经济这么一通胀，它们就换了个更长的名字：「领域特定语言」
+（domain-specific languages）。这类语言像是为某个特定任务量身定做的皮钦语。想想应用脚本
+语言、模板引擎、标记格式，还有配置文件。</p>
+<p><span name="little"></span><img src="image/introduction/little-languages.png" alt="随便挑几门小语言。" /></p>
+<aside name="little">
+<p>你可能碰上的一些小语言，随手挑几门。</p>
+</aside>
+<p>几乎每个大型软件项目都需要几个这样的东西。能用现成的，就别自己造轮子。可一旦把文档、
+调试器、编辑器支持、语法高亮，以及其他所有配套设施都算进来，自己动手造一门，要求可就太高
+了。</p>
+<p>但你多半还是会碰上这种事：现成的库都不合用，你不得不自己撸一个语法解析器或者别的工具。
+就算你复用的是别人的实现，也迟早要去调试它、维护它、扒开它的内脏翻。</p>
+<h3><a href="#语言是绝佳的练习" id="语言是绝佳的练习"><small>1&#8202;.&#8202;1&#8202;.&#8202;2</small>语言是绝佳的练习</a></h3>
+<p>长跑选手有时会在脚踝上绑沙袋训练，或者到空气稀薄的高原去。等他们后来把这些负担卸下来，
+四肢变轻、空气富氧，这份相对而言的轻松劲儿，就让他们能跑得更远、更快。</p>
+<p>实现一门语言，是对编程功力的实打实的考验。代码复杂，而且性能是硬指标。你必须把递归、
+动态数组、树、图和哈希表全都吃透。哈希表这种东西，你日常编程大概天天都在用，但你<strong>真的</strong>
+懂它吗？等我们从零造一个出来之后，我保证你懂。</p>
+<p>我打算让你看到，解释器并没有你想象的那么吓人，但要把一个实现好，依然是个挑战。迎上去干，
+你会变成一个更强的程序员，在日常干活时用数据结构和算法也会更聪明。</p>
+<h3><a href="#还有一个理由" id="还有一个理由"><small>1&#8202;.&#8202;1&#8202;.&#8202;3</small>还有一个理由</a></h3>
+<p>最后这个理由我很难说出口，因为它离我心太近了。小时候刚学会写程序，我就觉得语言里有某种
+魔法。第一次一个键一个键地敲出 BASIC 程序时，我根本无法想象 <strong>BASIC 自己</strong>是怎么造出来的。</p>
+<p>后来我注意到了：我那些大学同学一谈起他们的编译器课，脸上那种敬畏与恐惧混杂的表情，就足以
+让我相信：语言黑客是另一种人类——某种被特许研习秘术的巫师。</p>
+<p>这个<span name="image">形象</span>很迷人，但它有阴暗的一面。<strong>我</strong>并不觉得自己像个巫师，
+于是只剩下一个念头：我身上缺少某种加入这个圈子所必需的天生资质。尽管从我在课本上涂鸦乱编
+关键字开始，我就一直对语言着迷，但要鼓起勇气真正去学它们，我花了几十年。那种「魔法」的
+特质、那种独占感，把<strong>我</strong>关在了门外。</p>
+<aside name="image">
+<p>而且从业者一点也不客气，喜欢给这个形象加码。编程语言领域两部奠基之作的封面上，分别是
+<a href="https://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools">一条龙</a>和<a href="https://mitpress.mit.edu/sites/default/files/sicp/index.html">一个巫师</a>。</p>
+</aside>
+<p>等我真的开始七拼八凑地搭自己的小解释器时，我很快就明白了一件事：当然，根本没有什么魔法。
+那就是代码，而玩语言的人，也就是普通人。</p>
+<p><strong>确实</strong>有那么几种在语言领域之外很少见的技术，有些地方也稍微有点难。但也不会比你自己已经
+跨过去的其他障碍更难。我的希望是：如果你之前对着语言感到怵，而这本书帮你克服了那份畏惧，
+那我走之前，至少能让你比来的时候勇敢那么一丁点儿。</p>
+<p>而且，谁知道呢，说不定下一门伟大的语言就是<strong>你</strong>造出来的。总得有人来当这个人。</p>
+<h2><a href="#本书是怎么组织的" id="本书是怎么组织的"><small>1&#8202;.&#8202;2</small>本书是怎么组织的</a></h2>
+<p>这本书分成三部分。你现在读的是第一部分。几章的篇幅，用来给你定位、教一点语言黑客
+说的行话，再把 Lox——也就是我们将要实现的那门语言——介绍给你。</p>
+<p>另外两部分各造一个完整的 Lox 解释器。在这两部分里，每一章的结构都一样：挑一个语言特性，
+把背后的概念讲给你听，然后带你走一遍它的实现。</p>
+<p>我在这儿试错了相当久，才算把这两个解释器切成一章一章的块，每一块都建立在前几章之上，
+却不需要后面任何一章的东西。从第一章开始，你手上就会有一个能跑、能玩的程序。每过完一章，
+它就更功能齐全一点，到最后你就攒出一门完整的语言。</p>
+<p>除了大量激动人心的英文散文之外，每一章还有几处让人愉快的花样：</p>
+<h3><a href="#代码" id="代码"><small>1&#8202;.&#8202;2&#8202;.&#8202;1</small>代码</a></h3>
+<p>我们马上要开始<strong>手雕</strong>解释器了，所以这本书里是真的有代码。需要的每一行代码都在里面，
+每个代码片段还会告诉你要把它插进你那棵越长越大的实现的哪个位置。</p>
+<p>很多别的语言书和语言实现会用到 <a href="https://en.wikipedia.org/wiki/Lex_(software)">Lex</a> 和 <span name="yacc"><a href="https://en.wikipedia.org/wiki/Yacc">Yacc</a></span> 这类工具，也就是
+所谓的<strong>编译器-编译器</strong>：它们能从一份更高层的描述里，自动生成实现中的某些源文件。这类工具
+各有利弊，而利弊两边都有极其强烈的意见——有些人甚至说那是宗教信仰。</p>
+<aside name="yacc">
+<p>Yacc 是个工具：吃进一份文法文件，吐出一个编译器用的源文件。所以它有点像一个输出编译器的
+「编译器」——「编译器-编译器」这个词就是这么来的。</p>
+<p>Yacc 并不是这一类里的头一个，所以才叫 Yacc——<strong>Yet Another</strong> Compiler-Compiler（又一个
+编译器-编译器）。后来有个类似的工具叫 <a href="https://en.wikipedia.org/wiki/GNU_bison">Bison</a>，名字是拿 Yacc 的读音「yak」（牦牛）玩的
+双关。</p><img src="image/introduction/yak.png" alt="一头牦牛。" />
+<p>要是你觉得这些自我指涉和双关又迷人又好玩，那你在这儿就正合适。要是不觉得，那……嗯，也许
+语言书呆子的幽默感是后天培养出来的。</p>
+</aside>
+<p>我们在这本书里戒掉它们。我不想留下任何阴暗角落，让魔法和困惑躲在里头，所以一切都手写。
+正如你将看到的，这没那么可怕，而且这意味着你真的会理解每一行代码，以及两个解释器各自是怎么
+工作的。</p>
+<p>书里的约束跟「真实世界」不一样，所以这里的代码风格未必总是写出可维护的生产级软件的最好
+路子。如果我看上去对省略 <code>private</code>、或者声明一个全局变量这类事情有点吊儿郎当，请理解，
+我这么干是为了让代码看着不费眼睛。这里的版面没你的 IDE 那么宽，每一个字符都得算钱。</p>
+<p>另外，代码里的注释不多。这是因为每几行代码周围，都围着好几段货真价实的散文在解释它。既然
+你写书来给程序配解说，注释也就可以省了。不这么干的话，你大概应该比我多用一点 <code>//</code>。</p>
+<p>书里包含了每一行代码，也讲清了每一行的意思，但它不讲要把解释器编译并运行起来所需的那套
+机械功夫。我假定你能随手拼一个 Makefile，或者在你中意的 IDE 里建个项目，把代码跑起来。
+那类说明很快就会过时，而我希望这本书像 XO 白兰地那样越陈越香，而不是后院私酿。</p>
+<h3><a href="#代码片段" id="代码片段"><small>1&#8202;.&#8202;2&#8202;.&#8202;2</small>代码片段</a></h3>
+<p>既然书里可是实打实包含了实现所需的每一行代码，代码片段就相当精确。另外，因为我尽量让程序
+即便在缺了主要功能时也还能跑，有时候我们会加一些临时代码，等后面的片段再把它们替换掉。</p>
+<p>一个把全套配件都装上的代码片段长这样：</p>
+<div class="codehilite"><pre class="insert-before">
+      default:
+</pre><div class="source-file"><em>lox/Scanner.java</em><br>
+在 <em>scanToken</em>() 内<br>
+替换 1 行</div>
+<pre class="insert">
+        <span class="k">if</span> (<span class="i">isDigit</span>(<span class="i">c</span>)) {
+          <span class="i">number</span>();
+        } <span class="k">else</span> {
+          <span class="t">Lox</span>.<span class="i">error</span>(<span class="i">line</span>, <span class="s">&quot;Unexpected character.&quot;</span>);
+        }
+</pre><pre class="insert-after">
+        break;
+</pre></div>
+<div class="source-file-narrow"><em>lox/Scanner.java</em>，在 <em>scanToken</em>() 内，替换 1 行</div>
+<p>中间是你要加进去的新代码。它上面或下面可能夹着几行淡掉的代码，用来告诉你它在现有代码里
+该落在哪儿。旁边还有一小段说明，写着这个片段该放到哪个文件的什么位置。如果那段说明写的是
+「替换 _ 行」，那就意味着中间那几行淡掉的代码之间夹着一段现有代码，你需要把它删掉，换成
+这个新片段。</p>
+<h3><a href="#旁注" id="旁注"><small>1&#8202;.&#8202;2&#8202;.&#8202;3</small>旁注</a></h3>
+<p><span name="joke">旁注</span>里放着人物小传、历史背景、相关话题的参考资料，还有另外一些值得
+探索的方向的提示。为了读懂本书后面的内容，你<strong>并不需要</strong>掌握旁注里的任何东西，所以想跳过
+就跳过。我不会评判你，不过我可能会有点难过。</p>
+<aside name="joke">
+<p>好吧，至少有一部分旁注确实有必要。大多数旁注就是些傻笑话和业余画作。</p>
+</aside>
+<h3><a href="#习题" id="习题"><small>1&#8202;.&#8202;2&#8202;.&#8202;4</small>习题</a></h3>
+<p>每一章末尾都有几道练习。它们不像教科书的习题集——那种通常只是复习你已经学过的内容——
+这些题是为了让你学到比本章内容<strong>更多</strong>的东西。它们会把你从有人领路的路上推下来，逼你
+自己去探索。你会去查别的语言、去琢磨某个特性怎么实现，或者总之被踢出自己的舒适区。</p>
+<p><span name="warning">闯过</span>这些习题，你会带走一份更宽的视野，也许还会蹭破几块皮。想窝
+在游览车那圈舒适区里，那就跳过它们。这是你的书。</p>
+<aside name="warning">
+<p>提醒一句：习题经常要你改动正在造的那个解释器。你应该在一份代码副本上实现它们。后面的章节
+都假定你的解释器是一尘不染的（「没被习题糟蹋过」？）状态。</p>
+</aside>
+<h3><a href="#设计说明" id="设计说明"><small>1&#8202;.&#8202;2&#8202;.&#8202;5</small>设计说明</a></h3>
+<p>大多数「编程语言」书其实是地道的编程语言<strong>实现</strong>书。它们很少讨论，人该怎么<strong>设计</strong>一门被
+实现的语言。实现之所以好玩，是因为它被<span name="benchmark">精确地规定</span>着。我们这些
+程序员，似乎天生更亲近黑白分明的东西，更亲近一和零。</p>
+<aside name="benchmark">
+<p>我知道有很多语言黑客的职业生涯就建立在这上头。你从他们门缝底下塞进去一份语言规范，等
+几个月，代码和基准测试结果就出来了。</p>
+</aside>
+<p>就我个人而言，我觉得这世界对 <span name="fortran">FORTRAN 77</span> 的实现的需求，也就那么些。
+某个时刻，你会开始设计一门<strong>新</strong>语言。一旦开始玩<strong>那个</strong>游戏，等式里更柔软、更人性化的
+那一面就成了最要紧的：哪些特性容易学，怎么在创新和熟悉之间取平衡，什么语法对谁来说更好读。</p>
+<aside name="fortran">
+<p>希望你的新语言不会把打孔卡有多宽这种假设硬编码进它的文法里。</p>
+</aside>
+<p>这些东西会深刻影响你的新语言能不能成功。我希望你的语言能成功，所以在有些章节的末尾，我会
+附一段「设计说明」，一小篇关于编程语言人性化一角的随笔。这方面我不是专家——我也不知道真有
+谁是——所以读的时候请多加一大撮盐。这样吃起来才是更有味道的思想食粮，而这就是我的主要目的。</p>
+<h2><a href="#第一个解释器" id="第一个解释器"><small>1&#8202;.&#8202;3</small>第一个解释器</a></h2>
+<p>我们要用 <span name="lang">Java</span> 来写第一个解释器 jlox。重点放在<strong>概念</strong>上。我们会
+尽可能用最简单、最干净的代码，正确地实现这门语言的语义。这样既能让我们对基本手法熟悉
+起来，也能打磨我们对「这门语言到底该怎么表现」的理解。</p>
+<aside name="lang">
+<p>本书用 Java 和 C，不过已经有读者把代码移植到了<a href="https://github.com/munificent/craftinginterpreters/wiki/Lox-implementations">许多别的语言</a>。要是我挑的这几门
+不是你的菜，去那边看看。</p>
+</aside>
+<p>Java 很适合干这事。它抽象层次够高，我们不会被琐碎的实现细节淹没，但又足够直白。不像脚本
+语言那样，它底下藏着的机械东西通常没那么复杂，而且有静态类型帮你看清自己正在跟哪些数据
+结构打交道。</p>
+<p>我专门挑 Java，还有一个原因：它是一门面向对象的语言。九十年代这套范式横扫了编程界，
+如今已是数百万程序员占主导地位的思考方式。你十有八九早就习惯把代码组织成类和方法，那就
+让我们把你留在那个舒适区里。</p>
+<p>学界搞语言的人有时看不起面向对象语言，但事实是，连语言工作本身也在广泛使用它们。GCC 和
+LLVM 是用 C++ 写的，大多数 JavaScript 虚拟机也是。面向对象语言无处不在，而且<strong>为某门语言准备的</strong>
+工具链和编译器，往往就是<strong>用</strong>这门语言<span name="host">自己</span>写的。</p>
+<aside name="host">
+<p>编译器读进一种语言的源文件，做一番翻译，输出另一种语言的源文件。你可以用任何语言实现一个
+编译器，包括用它所编译的那门语言自己——这个过程叫<strong>自宿主</strong>（self-hosting）。</p>
+<p>你当然没法一开始就拿编译器自己来编译它自己。但假如你手上有另一个编译器——用别的语言写的，
+编译你的这门语言——你可以先用<strong>那个</strong>把你的编译器编译一遍。这样你就有了自己编译器的编译
+版本，可以用它去编译它未来的各个版本，而原先那个由别的编译器编出来的版本就可以扔了。这叫
+<strong>自举</strong>（bootstrapping），名字来自「抓住自己的靴子把自己提起来」这个形象。</p><img src="image/introduction/bootstrap.png" alt="事实：这才是美国牛仔的主要交通工具。" />
+</aside>
+<p>最后，Java 火得一塌糊涂。这意味着你很可能已经会它了，进书要学的东西也就更少。要是你对
+Java 还不够熟，别慌。我尽量只用它一个相当精简的子集。Java 7 的菱形运算符我用上了，好让
+代码短一点，但所谓「高级」特性也就用到这儿。你要是会别的面向对象语言，比如 C# 或 C++，
+也能凑合着往下走。</p>
+<p>到第二部分结束时，我们会有一个简单、好读的实现。它不快，但它是正确的。不过，我们能做成
+这样，靠的是站在 Java 虚拟机自己的运行时设施之上。我们想学的是，Java<strong>自己</strong>是怎么实现
+这些东西的。</p>
+<h2><a href="#第二个解释器" id="第二个解释器"><small>1&#8202;.&#8202;4</small>第二个解释器</a></h2>
+<p>所以在下一部分，我们从头再来一遍，但这回用 C。要理解一个实现<strong>究竟</strong>是怎么运作的——一路
+下到内存里的字节、下到流经 CPU 的代码——C 是最完美的语言。</p>
+<p>我们用 C 的一个重要原因，是我可以向你展示 C 特别擅长的东西，但这<strong>确实</strong>意味着你得跟它
+处得相当熟。你不必是丹尼斯·里奇的转世，但也不该被指针吓到。</p>
+<p>要是还没到位，就挑一本 C 的入门书啃掉，啃完再回这儿来。作为回报，读完这本书你会成为一个
+更强悍的 C 程序员。考虑到这么多语言实现都是用 C 写的——Lua、CPython，还有 Ruby 的 MRI，
+随便举几个——这很划算。</p>
+<p>在我们的 C 解释器 <span name="clox">clox</span> 里，Java 白送的那些东西，我们只能自己动手
+实现。我们要自己写动态数组和哈希表，自己决定对象在内存里怎么表示，还要造一个垃圾回收器来
+回收它们。</p>
+<aside name="clox">
+<p>这个名字我念成「西-洛克斯」，不过你也可以念成「克洛克斯」，甚至「克洛夫」——要是你高兴，
+把 x 念成希腊人那样也行。</p>
+</aside>
+<p>Java 那个实现专注的是正确。现在正确这件事做定了，我们转过来追求<strong>快</strong>。C 解释器里会装一个
+把 Lox 翻译成高效字节码表示的<span name="compiler">编译器</span>（别担心，那是什么意思我很快
+就会讲），然后再去执行这个字节码。Lua、Python、Ruby、PHP 以及许多其他成功语言的实现，用的
+都是同一个套路。</p>
+<aside name="compiler">
+<p>你以为这只是一本讲解释器的书？它同时也是本讲编译器的书。一份价钱两份货！</p>
+</aside>
+<p>我们甚至还会动手做基准测试和优化。到最后，我们会为这门语言攒出一个稳健、准确、够快的
+解释器，跟外面那些专业水准的实现掰手腕也不落下风。一本书加几千行代码，能做到这样，不赖吧。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>用来撰写并出版这本书的<a href="https://github.com/munificent/craftinginterpreters">那套我七拼八凑搞出来的小系统</a>，至少用到了六种领域特定
+语言。它们是哪些？</p>
+</li>
+<li>
+<p>用 Java 写一个「Hello, world!」程序并跑起来。配好让它能跑起来的 Makefile 或 IDE 工程。
+如果手边有调试器，用熟了它，在你程序运行的时候单步跟一遍。</p>
+</li>
+<li>
+<p>用 C 做同样的事。为了练练指针，定义一个由堆分配字符串组成的<a href="https://en.wikipedia.org/wiki/Doubly_linked_list">双向链表</a>。写几个函数，
+往里面插入、查找、删除元素。测一测它们。</p>
+</li>
+</ol>
+</div>
+<div class="design-note">
+<h2><a href="#design-note" id="design-note">设计说明：名字里能有什么？</a></h2>
+<p>写这本书最难的一件事之一，是给这门被实现的语言想个名字。我翻过了<strong>好几页</strong>候选名单，才
+找到一个管用的。等你开始造自己的语言的第一天就会发现，起名字这件事难得出奇。一个好名字得
+满足几个条件：</p>
+<ol>
+<li>
+<p><strong>它没被占用。</strong> 一不小心踩了别人的名字，你会招来各式各样的麻烦，法律上的、社交上的
+都有。</p>
+</li>
+<li>
+<p><strong>它好念。</strong> 要是事情顺利，会有大群大群的人念你语言的名字、写你语言的名字。任何超过
+两个音节、或者超过几个字母的东西，都会让他们烦得要命。</p>
+</li>
+<li>
+<p><strong>它足够独特，搜得到。</strong> 人们会拿你语言的名字去搜资料，所以你得挑一个够冷僻的词，搜
+出来的结果大部分才能指向你的文档。不过如今 AI 搜索引擎往结果里塞的东西太多，这一点也
+没那么要紧了。可你要是把语言取名叫「for」，那对用户可没什么好处。</p>
+</li>
+<li>
+<p><strong>它在好几个文化里都没有贬义。</strong> 这很难提前提防，但值得想一想。「尼姆罗德」（Nimrod）
+的设计者最后把语言改名叫「Nim」，因为太多人还记得《兔八哥》（Bugs Bunny）拿
+「尼姆罗德」当骂人的话。（兔八哥那是在反讽。）</p>
+</li>
+</ol>
+<p>如果候选名字扛过了这轮考验，就留下它。别再纠结去找一个能概括你语言精髓的名字。如果世上
+其他那些成功语言的名字能教给我们什么，那就是：名字其实没那么重要。你需要的不过是一个还
+算独特的记号。</p>
+</div>
+
+<footer>
+<a href="a-map-of-the-territory.html" class="next">
+  下一章：&ldquo;领域地图&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

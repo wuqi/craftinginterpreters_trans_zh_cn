@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+<title>Lox 语言 &middot; 手雕解释器</title>
+
+<!-- Tell mobile browsers we're optimized for them and they don't need to crop
+     the viewport. -->
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" type="text/css" href="style.css" />
+
+<!-- Oh, God, Source Code Pro is so beautiful it makes me want to cry. -->
+<link href='https://fonts.googleapis.com/css?family=Source+Code+Pro:400|Source+Sans+Pro:300,400,600' rel='stylesheet' type='text/css'>
+
+<link rel="icon" type="image/png" href="image/favicon.png" />
+<script src="jquery-3.4.1.min.js"></script>
+<script src="script.js"></script>
+
+<!-- Google analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-42804721-2', 'auto');
+  ga('send', 'pageview');
+</script>
+
+</head>
+<body id="top">
+
+<!-- <div class="scrim"></div> -->
+<nav class="wide">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="contents">
+<h3><a href="#top">Lox 语言<small>3</small></a></h3>
+
+<ul>
+    <li><a href="#你好，lox"><small>3.1</small> 你好，Lox</a></li>
+    <li><a href="#一门高级语言"><small>3.2</small> 一门高级语言</a></li>
+    <li><a href="#数据类型"><small>3.3</small> 数据类型</a></li>
+    <li><a href="#表达式"><small>3.4</small> 表达式</a></li>
+    <li><a href="#语句"><small>3.5</small> 语句</a></li>
+    <li><a href="#变量"><small>3.6</small> 变量</a></li>
+    <li><a href="#控制流"><small>3.7</small> 控制流</a></li>
+    <li><a href="#函数"><small>3.8</small> 函数</a></li>
+    <li><a href="#类"><small>3.9</small> 类</a></li>
+    <li><a href="#标准库"><small>3.10</small> 标准库</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>表达式与语句</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="a-map-of-the-territory.html" title="领域地图" class="left">&larr;&nbsp;上一</a>
+    <a href="welcome.html" title="欢迎">&uarr;&nbsp;返回</a>
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+</nav>
+
+<nav class="narrow">
+<a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+<a href="a-map-of-the-territory.html" title="领域地图" class="prev">←</a>
+<a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器" class="next">→</a>
+</nav>
+
+<div class="page">
+<div class="nav-wrapper">
+<nav class="floating">
+  <a href="/"><img src="image/logotype.png" title="手雕解释器"></a>
+  <div class="expandable">
+<h3><a href="#top">Lox 语言<small>3</small></a></h3>
+
+<ul>
+    <li><a href="#你好，lox"><small>3.1</small> 你好，Lox</a></li>
+    <li><a href="#一门高级语言"><small>3.2</small> 一门高级语言</a></li>
+    <li><a href="#数据类型"><small>3.3</small> 数据类型</a></li>
+    <li><a href="#表达式"><small>3.4</small> 表达式</a></li>
+    <li><a href="#语句"><small>3.5</small> 语句</a></li>
+    <li><a href="#变量"><small>3.6</small> 变量</a></li>
+    <li><a href="#控制流"><small>3.7</small> 控制流</a></li>
+    <li><a href="#函数"><small>3.8</small> 函数</a></li>
+    <li><a href="#类"><small>3.9</small> 类</a></li>
+    <li><a href="#标准库"><small>3.10</small> 标准库</a></li>
+    <li class="divider"></li>
+    <li class="end-part"><a href="#challenges">习题</a></li>
+    <li class="end-part"><a href="#design-note"><small>设计说明</small>表达式与语句</a></li>
+</ul>
+
+
+<div class="prev-next">
+    <a href="a-map-of-the-territory.html" title="领域地图" class="left">&larr;&nbsp;上一</a>
+    <a href="welcome.html" title="欢迎">&uarr;&nbsp;返回</a>
+    <a href="a-tree-walk-interpreter.html" title="第一部分 树遍历解释器" class="right">下一&nbsp;&rarr;</a>
+</div>  </div>
+  <a id="expand-nav">≡</a>
+</nav>
+</div>
+
+<article class="chapter">
+
+  <div class="number">3</div>
+  <h1>Lox 语言</h1>
+
+<blockquote>
+<p>对一个人来说，还有什么事能比给他做顿早餐更让他高兴的呢？</p>
+<p><cite>安东尼·伯丁</cite></p>
+</blockquote>
+<p>本书剩下的篇幅，我们会去照亮 Lox 语言的每一个阴暗角落，不过一上来就让你埋头给解释器写代码、
+连我们要造的东西长什么样都不给你看上一眼，也实在有点残忍。</p>
+<p>话虽如此，我也不想在你还没摸到你的<span name="home">文本编辑器</span>之前，先把你拖过一
+大堆语言律师文书和规范黑话。所以这会是一篇温和友好的 Lox 入门。它会省掉很多细节和边缘情况。
+那些我们以后有的是时间再讲。</p>
+<aside name="home">
+<p>要是不能自己动手把代码跑一遍，教程就没多大意思。可惜你现在还没有 Lox 解释器——因为你还没
+造过一个！</p>
+<p>别怕。你可以用<a href="https://github.com/munificent/craftinginterpreters">我的</a>。</p>
+</aside>
+<h2><a href="#你好，lox" id="你好，lox"><small>3&#8202;.&#8202;1</small>你好，Lox</a></h2>
+<p>这就是你的第一口 <span name="salmon">Lox</span>：</p>
+<aside name="salmon">
+<p>这是你尝的第一口 Lox，我是说这门语言。Lox 还有另一层意思：那种腌渍的冷熏三文鱼。
+你要是以前没吃过，也去尝一口吧。</p>
+</aside>
+<div class="codehilite"><pre><span class="c">// 你的第一个 Lox 程序！</span>
+<span class="k">print</span> <span class="s">&quot;Hello, world!&quot;</span>;
+</pre></div>
+<p>那条 <code>//</code> 行注释和结尾的分号已经说明，Lox 的语法属于 C 家族。（字符串外面没有括号，因为
+<code>print</code> 是一条内置语句，不是一个库函数。）</p>
+<p>现在，我可不打算说 <span name="c">C</span> 的语法有多<strong>棒</strong>。要是我们想要一门雅致的语言，
+大概会去模仿 Pascal 或者 Smalltalk。要是再往北欧家具式的极简走一步，那就该做一门 Scheme。
+这些语言各有各的好处。</p>
+<aside name="c">
+<p>我肯定是有偏心的，但我就是觉得 Lox 的语法相当干净。C 最要命的语法毛病出在类型上。丹尼斯·
+里奇有个想法叫「<a href="http://softwareengineering.stackexchange.com/questions/117024/why-was-the-c-syntax-for-arrays-pointers-and-functions-designed-this-way">声明反映使用</a>」，意思是变量声明的形式，恰好对应你要在这个变量上
+做的、把它变成基类型值的那些操作。这主意很聪明，但我不太觉得它在实践中效果有多好。</p>
+<p>Lox 没有静态类型，所以我们绕开了这个问题。</p>
+</aside>
+<p>而 C 家族语法真正给我们的，是另一样在语言里往往更有价值的东西：<strong>熟悉感</strong>。我知道你已经
+对这种风格游刃有余了，因为我们要用来<strong>实现</strong> Lox 的那两门语言——Java 和 C——也都是从它
+那儿继承来的。给 Lox 沿用同样的语法，你就少了一件要学的东西。</p>
+<h2><a href="#一门高级语言" id="一门高级语言"><small>3&#8202;.&#8202;2</small>一门高级语言</a></h2>
+<p>虽然这本书最后比我希望的厚了不少，但它还是不够大，装不下 Java 那样庞大的语言。为了在这几页
+里塞进 Lox 的两套完整实现，Lox 本身就不得不相当紧凑。</p>
+<p>一说到又小又有用的语言，我脑子里冒出来的都是 <span name="js">JavaScript</span>、Scheme
+和 Lua 这样的高级「脚本」语言。这三门里，Lox 看着最像 JavaScript，主要是因为大多数 C
+语法语言都像。后面我们会学到，Lox 处理作用域的办法紧贴着 Scheme。将在<a href="a-bytecode-virtual-machine.html">第三部分</a>
+里造的 C 版 Lox，则大量借鉴自 Lua 那套干净高效的实现。</p>
+<aside name="js">
+<p>如今 JavaScript 拿下了整个世界，被用来构建大得吓人的应用，已经很难再把它当成一门「小脚本
+语言」了。但布伦丹·艾奇当初是花<strong>十天</strong>把第一个 JS 解释器硬塞进 Netscape Navigator 的，
+目的只是让网页上的按钮能动起来。JavaScript 从那时起长大了，但它曾经是一门可爱的小语言。</p>
+<p>艾奇拼凑出 JS 用的原料和时间，跟一集《百战天龙》（MacGyver）差不多，所以它有些语义上的
+怪角，胶带和回形针在那儿露着馅呢。什么变量提升、动态绑定的 <code>this</code>、数组里的空洞、
+隐式转换之类的。</p>
+<p>Lox 我可以不慌不忙地慢慢写，所以它应该干净一点。</p>
+</aside>
+<p>Lox 在另外两个方面，也跟上面那三门语言一样：</p>
+<h3><a href="#动态类型" id="动态类型"><small>3&#8202;.&#8202;2&#8202;.&#8202;1</small>动态类型</a></h3>
+<p>Lox 是动态类型的。变量可以存任何类型的值，同一个变量甚至可以在不同时间存不同类型的值。
+要是你拿类型不对的值去做运算——比如说，拿一个数字去除一个字符串——那错误要到运行时才会
+被发现、报出来。</p>
+<p>喜欢<span name="static">静态</span>类型的理由有一大把，但它们还不足以盖过给 Lox 挑动态
+类型的那些讲实用的理由。一套静态类型系统，学起来和实现起来都是一大堆活儿。跳过它，你就
+得到一门更简单的语言和一本更薄的书。把类型检查推迟到运行时，我们的解释器能更早跑起来、
+执行代码。</p>
+<aside name="static">
+<p>毕竟，我们用来<strong>实现</strong> Lox 的那两门语言都是静态类型的。</p>
+</aside>
+<h3><a href="#自动内存管理" id="自动内存管理"><small>3&#8202;.&#8202;2&#8202;.&#8202;2</small>自动内存管理</a></h3>
+<p>高级语言的存在，就是为了消灭那些容易出错、又没技术含量的底层苦活。手动管理存储的分配和
+释放，还有什么能比这更烦人？没人会迎着清晨的太阳起床，然后喊「我等不及要去弄清楚今天分配
+的每一个字节该在哪儿调 <code>free()</code> 了！」</p>
+<p>管理内存的办法主要有两<span name="gc">种技术</span>：<strong>引用计数</strong>，和<strong>追踪式垃圾回收</strong>
+（通常就叫<strong>垃圾回收</strong>或者 <strong>GC</strong>）。引用计数实现起来简单得多——我想这就是 Perl、PHP 和
+Python 一开始都用它的原因。但时间一长，引用计数的局限就变得太麻烦了。这些语言后来全都加上
+了完整的追踪式 GC，或者至少加了够清理对象环用的那一部分。</p>
+<aside name="gc">
+<p>实践中，引用计数和追踪式更像一条连续谱的两头，而不是对立的两极。大多数引用计数系统最后都
+会做一点追踪来对付环，而分代收集器的写屏障眯起眼睛看也有点像 retain 调用。</p>
+<p>关于这块的详细讨论，请看《<a href="https://researcher.watson.ibm.com/researcher/files/us-bacon/Bacon04Unified.pdf">垃圾回收的统一理论</a>》（PDF）。</p>
+</aside>
+<p>追踪式垃圾回收的名声挺吓人。在原始内存的层面上干活，<strong>确实</strong>有点让人发怵。调试一个 GC，有时候
+会让你梦里都在看十六进制转储。但别忘了，这本书就是要驱散魔法、宰掉那些怪物的，所以我们<strong>是</strong>
+要自己写一个垃圾回收器的。我觉得你会发现那个算法相当简单，而且实现起来乐趣十足。</p>
+<h2><a href="#数据类型" id="数据类型"><small>3&#8202;.&#8202;3</small>数据类型</a></h2>
+<p>在 Lox 这个小宇宙里，组成万物的原子就是内置数据类型。它们只有几种：</p>
+<ul>
+<li>
+<p><strong><span name="bool">布尔值</span>。</strong> 不写逻辑就没法编程，不做逻辑就没有布尔值。
+<code>true</code> 和 <code>false</code>，软件里的阴与阳。不像某些古老语言那样征用一个现成的类型来表示真与假，
+Lox 有专门的布尔类型。这次远征我们可能是在凑合着过，但我可不是<strong>野蛮人</strong>。</p>
+<aside name="bool">
+<p>Lox 里唯一以人名命名的数据类型就是布尔值——它来自乔治·布尔，这就是「布尔」为什么要大写
+开头。他 1864 年去世，离把代数变成电的数字计算机出现还差着将近一个世纪。我不知道他要是
+看到自己的名字印在几十亿行 Java 代码上，会作何感想。</p>
+</aside>
+<p>布尔值当然有两个，每个都配一个字面量：</p>
+<div class="codehilite"><pre><span class="k">true</span>;  <span class="c">// 才不是 false 呢。</span>
+<span class="k">false</span>; <span class="c">// 可不是「不是 false」！</span>
+</pre></div>
+</li>
+<li>
+<p><strong>数字。</strong> Lox 只有一种数字：双精度浮点数。由于浮点数也能表示范围很大的整数，这一条
+就够覆盖大片地盘了，同时又让事情保持简单。</p>
+<p>功能齐全的语言有一大堆数字语法——十六进制、科学计数法、八进制，各种好玩的玩意儿。
+我们凑合用基本的整数和十进制字面量就够了。</p>
+<div class="codehilite"><pre><span class="n">1234</span>;  <span class="c">// 一个整数。</span>
+<span class="n">12.34</span>; <span class="c">// 一个小数。</span>
+</pre></div>
+</li>
+<li>
+<p><strong>字符串。</strong> 第一个例子里我们已经见过一个字符串字面量了。和大多数语言一样，它们用双引号
+括起来。</p>
+<div class="codehilite"><pre><span class="s">&quot;I am a string&quot;</span>;
+<span class="s">&quot;&quot;</span>;    <span class="c">// 空字符串。</span>
+<span class="s">&quot;123&quot;</span>; <span class="c">// 这是字符串，不是数字。</span>
+</pre></div>
+<p>等我们动手实现它们的时候你会看到，那串看着人畜无害的<span name="char">字符</span>里，
+藏着相当多的复杂性。</p>
+<aside name="char">
+<p>就连「character」这个词本身都是个滑头。它是 ASCII？Unicode？一个码位，还是一个
+「字素簇」？字符是怎么编码的？每个字符是固定大小，还是会变？</p>
+</aside></li>
+<li>
+<p><strong><code>nil</code>。</strong> 还有最后一个内置值，它从没被邀请来过这个派对，却总是不知道从哪儿冒出来。
+它表示「没有值」。在别的很多语言里，这东西叫「null」。在 Lox 里我们写作 <code>nil</code>。
+（等我们实现它的时候，这样能把「我们在说 Lox 的 <code>nil</code>」和「我们在说 Java 或 C 的
+<code>null</code>」区分开。）</p>
+<p>一门语言不设空值，是有充分理由的——空指针错误是我们这行的祸根。要是我们做的是一门
+静态类型语言，那值得试着禁掉它。可在动态类型的语言里，禁掉它往往比留着它还更烦人。</p>
+</li>
+</ul>
+<h2><a href="#表达式" id="表达式"><small>3&#8202;.&#8202;4</small>表达式</a></h2>
+<p>要是内置数据类型和它们的字面量是原子，那<strong>表达式</strong>一定就是分子。下面这些大多你很熟悉。</p>
+<h3><a href="#算术" id="算术"><small>3&#8202;.&#8202;4&#8202;.&#8202;1</small>算术</a></h3>
+<p>Lox 配齐了你从 C 和别的语言里又爱又熟的那套基本算术运算符：</p>
+<div class="codehilite"><pre><span class="i">add</span> + <span class="i">me</span>;
+<span class="i">subtract</span> - <span class="i">me</span>;
+<span class="i">multiply</span> * <span class="i">me</span>;
+<span class="i">divide</span> / <span class="i">me</span>;
+</pre></div>
+<p>运算符两边的子表达式叫<strong>操作数</strong>。因为它们有<strong>两个</strong>，所以这些叫<strong>二元</strong>运算符。
+（跟「二进制」在一和零意义上的用法毫无关系。）又因为运算符被<span name="fixity">固定</span>在
+操作数的<strong>中间</strong>，这些也叫<strong>中缀</strong>运算符（相对于运算符在操作数之前的<strong>前缀</strong>运算符，
+以及在其之后的<strong>后缀</strong>运算符）。</p>
+<aside name="fixity">
+<p>有些运算符的操作数不止两个，而且运算符在它们之间交错穿插。广泛使用的里面只有 C 一族的
+那个「条件」运算符，或者叫「三目」运算符：</p>
+<div class="codehilite"><pre><span class="i">condition</span> ? <span class="i">thenArm</span> : <span class="i">elseArm</span>;
+</pre></div>
+<p>有人管这类叫**混缀（mixfix）**运算符。有几门语言允许你自己定义运算符，并控制它放在哪个
+位置——也就是它的「定缀（fixity）」。</p>
+</aside>
+<p>有一个算术运算符其实<strong>既是中缀又是前缀</strong>。那个 <code>-</code> 运算符还能用来对数字取负。</p>
+<div class="codehilite"><pre>-<span class="i">negateMe</span>;
+</pre></div>
+<p>这些运算符全都作用于数字，喂给它们的任何其他类型都是错误。例外是 <code>+</code>——你还可以喂给它
+两个字符串，把它们拼起来。</p>
+<h3><a href="#比较与相等" id="比较与相等"><small>3&#8202;.&#8202;4&#8202;.&#8202;2</small>比较与相等</a></h3>
+<p>再往前走一点，我们还有几个运算符，它们的返回值总是布尔值。我们可以比较数字（而且只能是
+数字），用的是那套「Ye Olde」式的古老比较运算符。</p>
+<div class="codehilite"><pre><span class="i">less</span> &lt; <span class="i">than</span>;
+<span class="i">lessThan</span> &lt;= <span class="i">orEqual</span>;
+<span class="i">greater</span> &gt; <span class="i">than</span>;
+<span class="i">greaterThan</span> &gt;= <span class="i">orEqual</span>;
+</pre></div>
+<p>我们可以拿任意两个值来测相等和不等。</p>
+<div class="codehilite"><pre><span class="n">1</span> == <span class="n">2</span>;         <span class="c">// false.</span>
+<span class="s">&quot;cat&quot;</span> != <span class="s">&quot;dog&quot;</span>; <span class="c">// true.</span>
+</pre></div>
+<p>哪怕类型不同也行。</p>
+<div class="codehilite"><pre><span class="n">314</span> == <span class="s">&quot;pi&quot;</span>; <span class="c">// false.</span>
+</pre></div>
+<p>不同类型的值<strong>永远</strong>不等价。</p>
+<div class="codehilite"><pre><span class="n">123</span> == <span class="s">&quot;123&quot;</span>; <span class="c">// false.</span>
+</pre></div>
+<p>我一般来说反对隐式转换。</p>
+<h3><a href="#逻辑运算符" id="逻辑运算符"><small>3&#8202;.&#8202;4&#8202;.&#8202;3</small>逻辑运算符</a></h3>
+<p>取非运算符是个前缀 <code>!</code>，操作数为真时它返回 <code>false</code>，反之亦然。</p>
+<div class="codehilite"><pre>!<span class="k">true</span>;  <span class="c">// false.</span>
+!<span class="k">false</span>; <span class="c">// true.</span>
+</pre></div>
+<p>另外两个逻辑运算符，其实就是披着表达式外衣的控制流结构。一个 <span name="and"><code>and</code></span>
+表达式判断两个值<strong>是否都</strong>为真。如果左操作数为假，它就返回左操作数，否则返回右操作数。</p>
+<div class="codehilite"><pre><span class="k">true</span> <span class="k">and</span> <span class="k">false</span>; <span class="c">// false.</span>
+<span class="k">true</span> <span class="k">and</span> <span class="k">true</span>;  <span class="c">// true.</span>
+</pre></div>
+<p>而一个 <code>or</code> 表达式判断两个值里<strong>是否有</strong>（或者两个都是）为真。如果左操作数为真，它就
+返回左操作数，否则返回右操作数。</p>
+<div class="codehilite"><pre><span class="k">false</span> <span class="k">or</span> <span class="k">false</span>; <span class="c">// false.</span>
+<span class="k">true</span> <span class="k">or</span> <span class="k">false</span>;  <span class="c">// true.</span>
+</pre></div>
+<aside name="and">
+<p>我给这两个用了 <code>and</code> 和 <code>or</code>，而不是 <code>&amp;&amp;</code> 和 <code>||</code>，因为 Lox 不用 <code>&amp;</code> 和 <code>|</code> 来做位运算。
+要是只引入双字符形式而没有单字符的，总觉得哪里不对。</p>
+<p>另外，我也有点喜欢用单词来做这两个运算，因为它们说到底是控制流结构，不是简单的运算符。</p>
+</aside>
+<p><code>and</code> 和 <code>or</code> 之所以像控制流结构，是因为它们会<strong>短路</strong>。<code>and</code> 不光在左操作数为假时返回左
+操作数，那种情况下它干脆连右操作数都<strong>不求值</strong>。反过来说（用逆否命题的方式讲？），
+如果一个 <code>or</code> 的左操作数为真，右边就被跳过了。</p>
+<h3><a href="#优先级与分组" id="优先级与分组"><small>3&#8202;.&#8202;4&#8202;.&#8202;4</small>优先级与分组</a></h3>
+<p>这些运算符的优先级和结合性，全都是你从 C 那边带来的预期值。（等我们讲到语法解析，会
+<strong>精确得多</strong>。）在优先级不是你想要的时候，你可以用 <code>()</code> 把东西括起来。</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">average</span> = (<span class="i">min</span> + <span class="i">max</span>) / <span class="n">2</span>;
+</pre></div>
+<p>由于它们在技术上实在没什么意思，我把通常那套运算符动物园的其余部分，从我们这门小语言里
+剔出去了。没有位运算、移位、取模，也没有条件运算符。我不打分，不过你要是给自己的 Lox
+实现加上它们，能在我这儿加印象分。</p>
+<p>那些就是表达式的各种形态了（除了几个跟后面才会讲到的特性相关的），所以我们往上一层。</p>
+<h2><a href="#语句" id="语句"><small>3&#8202;.&#8202;5</small>语句</a></h2>
+<p>现在说到语句了。表达式的主要活儿是产出<strong>值</strong>，语句的活儿则是产生<strong>效果</strong>。既然按定义语句
+不求值成什么东西，那要想有用，它就得以别的方式改变世界——通常是改动某种状态、读取输入，
+或者产出输出。</p>
+<p>你已经见过两种语句了。第一种是：</p>
+<div class="codehilite"><pre><span class="k">print</span> <span class="s">&quot;Hello, world!&quot;</span>;
+</pre></div>
+<p>一条 <span name="print"><code>print</code> 语句</span>对单个表达式求值，并把结果显示给用户。你也见过
+这样一些语句：</p>
+<aside name="print">
+<p>把 <code>print</code> 烤进语言里，而不是只把它做成一个核心库函数，这是个 hack。但对我们来说这是个
+<strong>有用</strong>的 hack：它意味着，我们那个还在半路上的解释器，在我们把定义函数、按名字查找、
+调用函数所需的那套机械东西都实现出来之前，就能先开始产出输出了。</p>
+</aside>
+<div class="codehilite"><pre><span class="s">&quot;some expression&quot;</span>;
+</pre></div>
+<p>一个表达式后面跟个分号（<code>;</code>），就把它提升到了语句身份。这东西被叫作（名字起得够有想象力
+的）<strong>表达式语句</strong>。</p>
+<p>要是你想把一串语句打包塞进一个只该有一条语句的地方，你可以把它们包进一个<strong>块</strong>。</p>
+<div class="codehilite"><pre>{
+  <span class="k">print</span> <span class="s">&quot;One statement.&quot;</span>;
+  <span class="k">print</span> <span class="s">&quot;Two statements.&quot;</span>;
+}
+</pre></div>
+<p>块还会影响作用域，这就引出了下一节……</p>
+<h2><a href="#变量" id="变量"><small>3&#8202;.&#8202;6</small>变量</a></h2>
+<p>你用 <code>var</code> 语句来声明变量。要是你<span name="omit">省掉</span>初始化器，变量值就默认为
+<code>nil</code>。</p>
+<aside name="omit">
+<p>这又是那种「没有 <code>nil</code>、逼着每个变量都必须初始化成某个值」反而比跟 <code>nil</code> 打交道更烦人的
+情况。</p>
+</aside>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">imAVariable</span> = <span class="s">&quot;here is my value&quot;</span>;
+<span class="k">var</span> <span class="i">iAmNil</span>;
+</pre></div>
+<p>一旦声明好了，你自然就可以用变量名来访问和赋值。</p>
+<p><span name="breakfast"></span></p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">breakfast</span> = <span class="s">&quot;bagels&quot;</span>;
+<span class="k">print</span> <span class="i">breakfast</span>; <span class="c">// &quot;bagels&quot;.</span>
+<span class="i">breakfast</span> = <span class="s">&quot;beignets&quot;</span>;
+<span class="k">print</span> <span class="i">breakfast</span>; <span class="c">// &quot;beignets&quot;.</span>
+</pre></div>
+<aside name="breakfast">
+<p>你看得出来，我是不是习惯趁早上还没吃任何东西的时候写这本书？</p>
+</aside>
+<p>变量作用域的规则我这儿就不展开了，因为后面几章我们会花惊人的时间来把那些规则一寸一寸地
+测绘一遍。多数情况下，跟你在 C 或 Java 里养成的预期一样。</p>
+<h2><a href="#控制流" id="控制流"><small>3&#8202;.&#8202;7</small>控制流</a></h2>
+<p>要是没法跳过一段代码，或者没法把一段代码多执行几遍，就很难写出<span name="flow">有用</span>
+的程序。这就意味着控制流。除了前面已经讲过的逻辑运算符，Lox 还直接从 C 搬来了三条语句。</p>
+<aside name="flow">
+<p>我们已经有 <code>and</code> 和 <code>or</code> 可以用来分支，理论上也<strong>可以</strong>用递归来重复代码，所以从理论上说
+这就够了。不过，在一门命令式风格的语言里，用这种方式写程序会相当别扭。</p>
+<p>另一方面，Scheme 根本没有内建的循环结构，它<strong>确实</strong>靠递归来做重复。Smalltalk 没有内建的
+分支结构，靠的是动态派发来决定性地执行代码。</p>
+</aside>
+<p>一条 <code>if</code> 语句根据某个条件，执行两条语句中的其中一条。</p>
+<div class="codehilite"><pre><span class="k">if</span> (<span class="i">condition</span>) {
+  <span class="k">print</span> <span class="s">&quot;yes&quot;</span>;
+} <span class="k">else</span> {
+  <span class="k">print</span> <span class="s">&quot;no&quot;</span>;
+}
+</pre></div>
+<p>一个 <code>while</code> <span name="do">循环</span>只要条件表达式求值为真，就反复执行循环体。</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">a</span> = <span class="n">1</span>;
+<span class="k">while</span> (<span class="i">a</span> &lt; <span class="n">10</span>) {
+  <span class="k">print</span> <span class="i">a</span>;
+  <span class="i">a</span> = <span class="i">a</span> + <span class="n">1</span>;
+}
+</pre></div>
+<aside name="do">
+<p>我没把 <code>do while</code> 循环放进 Lox，因为它不算常见，而且教不了你任何你不会从 <code>while</code> 那里学到
+的东西。你要是高兴，尽管往自己的实现里加。这是你的派对。</p>
+</aside>
+<p>最后，我们还有 <code>for</code> 循环。</p>
+<div class="codehilite"><pre><span class="k">for</span> (<span class="k">var</span> <span class="i">a</span> = <span class="n">1</span>; <span class="i">a</span> &lt; <span class="n">10</span>; <span class="i">a</span> = <span class="i">a</span> + <span class="n">1</span>) {
+  <span class="k">print</span> <span class="i">a</span>;
+}
+</pre></div>
+<p>这个循环干的事跟前面那个 <code>while</code> 循环一样。大多数现代语言还都有某种 <span name="foreach"><code>for-in</code></span>
+或者 <code>foreach</code> 循环，用来显式地遍历各种序列类型。在一门真正的语言里，那比我们这里这个
+粗糙的 C 风格 <code>for</code> 循环要好。Lox 保持基本款。</p>
+<aside name="foreach">
+<p>这是我在实现被切成很多章的背景下做的一个让步。<code>for-in</code> 循环需要在迭代器协议里搞某种动态
+派发来处理不同类型的序列，而我们讲完控制流之后才能做到。我们可以回头再补上 <code>for-in</code>
+循环，但我不觉得那能教会你什么特别有意思的东西。</p>
+</aside>
+<h2><a href="#函数" id="函数"><small>3&#8202;.&#8202;8</small>函数</a></h2>
+<p>函数调用表达式看起来跟在 C 里一模一样。</p>
+<div class="codehilite"><pre><span class="i">makeBreakfast</span>(<span class="i">bacon</span>, <span class="i">eggs</span>, <span class="i">toast</span>);
+</pre></div>
+<p>你也可以调用一个函数而不给它传任何东西。</p>
+<div class="codehilite"><pre><span class="i">makeBreakfast</span>();
+</pre></div>
+<p>跟 Ruby 之类的语言不一样，这种情况下的括号是必须的。你要是省掉括号，那个名字就不
+<strong>调用</strong>函数，只是指代它。</p>
+<p>一门语言要是不能让你定义自己的函数，那就没多大意思。在 Lox 里，你用 <span name="fun"><code>fun</code></span>
+来做这件事。</p>
+<aside name="fun">
+<p>我见过用 <code>fn</code>、<code>fun</code>、<code>func</code> 和 <code>function</code> 的语言。我到现在还在盼着能在某个地方撞见一个
+<code>funct</code>、<code>functi</code>，或者 <code>functio</code>。</p>
+</aside>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">printSum</span>(<span class="i">a</span>, <span class="i">b</span>) {
+  <span class="k">print</span> <span class="i">a</span> + <span class="i">b</span>;
+}
+</pre></div>
+<p>现在是时候理清几个<span name="define">术语</span>了。有些人对「形参（parameter）」和
+「实参（argument）」这两个词混用，在很多人看来它们也确实可以互换。可我们后面要花很多时间
+把最细的绒毛一根根劈开来辨语义，所以先把词磨利。从这儿开始：</p>
+<ul>
+<li>
+<p><strong>实参（argument）<strong>是你调用函数时传给它的实际值。所以函数</strong>调用</strong>带的是一份
+<strong>实参</strong>列表。有时候你会听见有人管这些叫<strong>实际参数</strong>。</p>
+</li>
+<li>
+<p><strong>形参（parameter）<strong>是函数体内部持有那个实参值的变量。所以函数</strong>声明</strong>带的是一份
+<strong>形参</strong>列表。别人管这些叫<strong>形式参数</strong>，或者干脆叫 <strong>formals</strong>。</p>
+</li>
+</ul>
+<aside name="define">
+<p>既然说术语，有些静态类型的语言，比如 C，会区分函数的<strong>声明</strong>和<strong>定义</strong>。声明把函数的类型
+绑定到它的名字上，好让调用能被类型检查，但并不提供函数体。定义则既声明了函数，也填上了
+函数体，好让函数能被编译。</p>
+<p>由于 Lox 是动态类型的，这个区分没有意义。一份函数声明已经把整个函数（包括函数体）都规定
+清楚了。</p>
+</aside>
+<p>函数体永远是一个块。在它里面，你可以用一条 <code>return</code> 语句返回一个值。</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">returnSum</span>(<span class="i">a</span>, <span class="i">b</span>) {
+  <span class="k">return</span> <span class="i">a</span> + <span class="i">b</span>;
+}
+</pre></div>
+<p>要是执行到了块的末尾却没撞上 <code>return</code>，就会<span name="sneaky">隐式地</span>返回 <code>nil</code>。</p>
+<aside name="sneaky">
+<p>瞧，我早说了 <code>nil</code> 会趁我们没留意的时候偷偷溜进来。</p>
+</aside>
+<h3><a href="#闭包" id="闭包"><small>3&#8202;.&#8202;8&#8202;.&#8202;1</small>闭包</a></h3>
+<p>函数在 Lox 里是<strong>一等公民</strong>，说白了就是它们是真正的值，你能拿到引用、存进变量、到处传递
+等等。下面这样能跑：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">addPair</span>(<span class="i">a</span>, <span class="i">b</span>) {
+  <span class="k">return</span> <span class="i">a</span> + <span class="i">b</span>;
+}
+
+<span class="k">fun</span> <span class="i">identity</span>(<span class="i">a</span>) {
+  <span class="k">return</span> <span class="i">a</span>;
+}
+
+<span class="k">print</span> <span class="i">identity</span>(<span class="i">addPair</span>)(<span class="n">1</span>, <span class="n">2</span>); <span class="c">// 打印出 &quot;3&quot;。</span>
+</pre></div>
+<p>由于函数声明是语句，你可以在另一个函数里声明局部函数。</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">outerFunction</span>() {
+  <span class="k">fun</span> <span class="i">localFunction</span>() {
+    <span class="k">print</span> <span class="s">&quot;I&#39;m local!&quot;</span>;
+  }
+
+  <span class="i">localFunction</span>();
+}
+</pre></div>
+<p>要是你把局部函数、一等函数和块作用域三者放在一起用，就会撞上这样一种有意思的情况：</p>
+<div class="codehilite"><pre><span class="k">fun</span> <span class="i">returnFunction</span>() {
+  <span class="k">var</span> <span class="i">outside</span> = <span class="s">&quot;outside&quot;</span>;
+
+  <span class="k">fun</span> <span class="i">inner</span>() {
+    <span class="k">print</span> <span class="i">outside</span>;
+  }
+
+  <span class="k">return</span> <span class="i">inner</span>;
+}
+
+<span class="k">var</span> <span class="i">fn</span> = <span class="i">returnFunction</span>();
+<span class="i">fn</span>();
+</pre></div>
+<p>这里，<code>inner()</code> 访问了一个在外层函数里声明、但不在自己函数体内的局部变量。这合规吗？既然
+如今这么多语言都从 Lisp 借去了这个特性，你大概已经知道答案是合规的了。</p>
+<p>要让它跑得通，<code>inner()</code> 就必须「抓住」它用到的每一个外层变量的引用，好让它们在外层函数
+已经返回之后还能继续存在。我们把这样的函数叫做 <span name="closure"><strong>闭包</strong></span>。
+如今这个词常常被用来指<strong>任何</strong>一等函数，不过如果那个函数恰好没捕获任何变量的话，这算是个
+误称。</p>
+<aside name="closure">
+<p>「closure」这个词是彼得·兰丁造出来的。是啊，编程语言里几乎一半的术语都是他发明的。其中
+大多数出自一篇了不起的论文，《<a href="https://homepages.inf.ed.ac.uk/wadler/papers/papers-we-love/landin-next-700.pdf">接下来七百种编程语言</a>》。</p>
+<p>要实现这类函数，你得造一个数据结构，把函数的代码和它需要的外层变量捆在一起。他把它叫作
+「closure」，是因为它把自己需要的变量<strong>关</strong>在里面，并抓住不放。</p>
+</aside>
+<p>你可以想象，实现这些东西会添上一些复杂度，因为我们再也不能假定变量作用域严格像一座栈那样
+工作了——局部变量不会在函数返回的那一刻就蒸发掉。接下来我们会有一段愉快的时光，学习怎么
+把这些东西做得既正确又高效。</p>
+<h2><a href="#类" id="类"><small>3&#8202;.&#8202;9</small>类</a></h2>
+<p>由于 Lox 既有动态类型、又有词法（大致就是「块」）作用域、还有闭包，它离成为一门函数式
+语言大概也就差一半。但正如你会看到的，它离成为一门面向对象语言，<strong>也</strong>差不多是差一半。
+这两种范式都有大把的好处，所以我觉得各拿一点写进书里是值得的。</p>
+<p>既然类一直因为名不副实而挨骂，让我先解释一下我为什么还是把类放进了 Lox 和这本书。其实
+这里有两个问题：</p>
+<h3><a href="#为什么会有语言想搞成面向对象的？" id="为什么会有语言想搞成面向对象的？"><small>3&#8202;.&#8202;9&#8202;.&#8202;1</small>为什么会有语言想搞成面向对象的？</a></h3>
+<p>如今像 Java 这样的面向对象语言都已经完全商业化了，只开体育馆演唱会，嘴上说喜欢它们已经不时
+髦了。那谁还会做一门<strong>新</strong>的带对象的语言？那不是跟用八轨磁带发唱片一样吗？</p>
+<p>九十年代那阵「什么都继承、永远在继承」的狂热，确实搞出了一些怪物般的类层级结构，但
+<strong>面向对象编程</strong>（<strong>OOP</strong>）到现在依然很顶。几十亿行成功代码都是用 OOP 语言写的，上百万个
+应用因此交付到了开心的用户手中。今天还在写代码的程序员里，很可能大多数用的就是面向对象
+语言。他们总不可能<strong>全都</strong>错得那么离谱吧。</p>
+<p>具体到一门动态类型的语言，对象相当好用。我们需要<strong>某种</strong>方式来定义复合数据类型，把一堆
+东西打包捆在一起。</p>
+<p>如果我们还能把方法挂到这些东西上，那就不用再给每个函数名前面都缀上它所操作的数据类型名，
+来避免跟别的类型的同名函数撞车了。在 Racket 之类的语言里，你会被迫把函数起成
+<code>hash-copy</code>（复制哈希表）和 <code>vector-copy</code>（复制向量）这样的名字，好让它们互不干扰。方法
+的作用域是对象，这个问题就没了。</p>
+<h3><a href="#为什么-lox-是面向对象的？" id="为什么-lox-是面向对象的？"><small>3&#8202;.&#8202;9&#8202;.&#8202;2</small>为什么 Lox 是面向对象的？</a></h3>
+<p>我本可以说对象很酷，但它们仍然超出了本书的范围。大多数编程语言书——尤其是那些试图实现
+一整门语言的书——都不讲对象。在我看来，这意味着这个话题没被讲好。一个这么普及的范式，
+被这样漏掉，我挺难过的。</p>
+<p>考虑到我们当中有那么多人整天都在<strong>用</strong> OOP 语言，这世界似乎可以稍微补一点关于怎么<strong>造</strong>
+一门这样的语言的资料。正如你将看到的，这事儿挺有意思的。没有你担心的那么难，但也没有你
+以为的那么简单。</p>
+<h3><a href="#类还是原型" id="类还是原型"><small>3&#8202;.&#8202;9&#8202;.&#8202;3</small>类还是原型</a></h3>
+<p>说到对象，其实有两套路子，<a href="https://en.wikipedia.org/wiki/Class-based_programming">类</a>和<a href="https://en.wikipedia.org/wiki/Prototype-based_programming">原型</a>。类出现得更早，而且靠着
+C++、Java、C# 之类的家伙，比原型常见得多。原型在 JavaScript 阴差阳错地接管世界之前，几乎
+是被彻底遗忘的旁支。</p>
+<p>在基于类的语言里，有两个核心概念：实例和类。实例保存每个对象的状态，并且持有一个指向
+自己那个类的引用。类里装着方法和继承链。要在实例上调用一个方法，总归要绕一层间接。你得
+<span name="dispatch">查找</span>这个实例的类，然后到<strong>那里</strong>去找方法：</p>
+<aside name="dispatch">
+<p>在 C++ 这样的静态类型语言里，方法查找通常在编译时根据实例的<strong>静态</strong>类型完成，这就是
+<strong>静态派发</strong>。与之相对，<strong>动态派发</strong>是在运行时去查实际的实例对象的类。静态类型语言里的
+虚方法，以及 Lox 这样的动态类型语言里的所有方法，都是这么工作的。</p>
+</aside><img src="image/the-lox-language/class-lookup.png" alt="类和实例上的字段与方法是怎么查找的" />
+<p>基于原型的语言把这两个概念<span name="blurry">揉</span>到了一起。它们只有对象——没有类
+——而且每个对象自己都可以含有状态和方法。对象之间可以直接继承（用原型那一套行话说是
+「委托给」）：</p>
+<aside name="blurry">
+<p>实践中，基于类和基于原型的语言之间的界线是模糊的。JavaScript 的「构造函数」这概念
+<a href="http://gameprogrammingpatterns.com/prototype.html#what-about-javascript">把你往定义类式对象的方向狠推</a>。与此同时，基于类的 Ruby 也完全乐见你把方法挂到
+单个实例上。</p>
+</aside><img src="image/the-lox-language/prototype-lookup.png" alt="原型式系统里字段与方法是怎么查找的" />
+<p>这意味着在某些方面，原型式语言比类更根本。它们实现起来非常漂亮，因为它们<strong>就是</strong>简单。
+而且它们能表达大量奇特的模式，而类是把你从这些模式上引开的。</p>
+<p>不过我翻过的原型式语言代码<strong>实在太多</strong>了——包括<a href="http://finch.stuffwithstuff.com/">我自己设计的一些</a>。你知道大家
+一般拿原型的那一身力量和灵活性来干什么吗？……他们用它们来重新发明类。</p>
+<p>我不知道<strong>为什么</strong>会这样，但人似乎天生就更偏好基于类的（Classic？Classy？）风格。原型
+在语言里<strong>确实</strong>更简单，可它们似乎只是靠<span name="waterbed">把复杂度推给</span>用户才
+做到的。所以对 Lox 来说，我们替用户省了这个麻烦，直接把类烤进去。</p>
+<aside name="waterbed">
+<p>Perl 的发明者/先知拉里·沃尔管这叫「<a href="http://wiki.c2.com/?WaterbedTheory">水床理论</a>」。有些复杂度是本质的，
+消不掉。你在一个地方把它按下去，它就会在另一个地方鼓起来。</p>
+<p>原型式语言与其说是<strong>消除</strong>了类的复杂度，不如说是让<strong>用户</strong>通过自建类式的元编程库，把这份
+复杂度接了过去。</p>
+</aside>
+<h3><a href="#lox-里的类" id="lox-里的类"><small>3&#8202;.&#8202;9&#8202;.&#8202;4</small>Lox 里的类</a></h3>
+<p>理由说够了，看看我们实际手上有什么。在大多数语言里，类是一大群特征的集合。对 Lox，我只挑
+了我认为最亮的几颗星。类和方法这样声明：</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Breakfast</span> {
+  <span class="i">cook</span>() {
+    <span class="k">print</span> <span class="s">&quot;Eggs a-fryin&#39;!&quot;</span>;
+  }
+
+  <span class="i">serve</span>(<span class="i">who</span>) {
+    <span class="k">print</span> <span class="s">&quot;Enjoy your breakfast, &quot;</span> + <span class="i">who</span> + <span class="s">&quot;.&quot;</span>;
+  }
+}
+</pre></div>
+<p>类体里装着它的方法。方法看起来像函数声明，只是没有 <span name="method"><code>fun</code> 关键字</span>。
+类声明执行的时候，Lox 会造出一个类对象，把它存进一个以类名命名的变量里。跟函数一样，类
+在 Lox 里也是一等公民。</p>
+<aside name="method">
+<p>不过它们一样好玩。</p>
+</aside>
+<div class="codehilite"><pre><span class="c">// 把它存进变量。</span>
+<span class="k">var</span> <span class="i">someVariable</span> = <span class="t">Breakfast</span>;
+
+<span class="c">// 把它传给函数。</span>
+<span class="i">someFunction</span>(<span class="t">Breakfast</span>);
+</pre></div>
+<p>接下来，我们需要一种造实例的办法。我们本可以加个 <code>new</code> 之类的新关键字，但为了简单起见，
+在 Lox 里，类自己就是造实例的工厂函数。把一个类当函数那样调用，就会造出一个属于它自己的
+新实例。</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">breakfast</span> = <span class="t">Breakfast</span>();
+<span class="k">print</span> <span class="i">breakfast</span>; <span class="c">// &quot;Breakfast instance&quot;.</span>
+</pre></div>
+<h3><a href="#实例化与初始化" id="实例化与初始化"><small>3&#8202;.&#8202;9&#8202;.&#8202;5</small>实例化与初始化</a></h3>
+<p>只有行为的类没什么用武之地。面向对象编程背后的想法，是把行为<strong>和</strong>状态一起封装起来。
+要这么做，你就需要字段。Lox 跟别的动态类型语言一样，允许你往对象上随便加属性。</p>
+<div class="codehilite"><pre><span class="i">breakfast</span>.<span class="i">meat</span> = <span class="s">&quot;sausage&quot;</span>;
+<span class="i">breakfast</span>.<span class="i">bread</span> = <span class="s">&quot;sourdough&quot;</span>;
+</pre></div>
+<p>给一个字段赋值，如果它还不存在，就会把它创建出来。</p>
+<p>如果你想在方法里访问当前对象的某个字段或方法，就用那个老可靠的 <code>this</code>。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Breakfast</span> {
+  <span class="i">serve</span>(<span class="i">who</span>) {
+    <span class="k">print</span> <span class="s">&quot;Enjoy your &quot;</span> + <span class="k">this</span>.<span class="i">meat</span> + <span class="s">&quot; and &quot;</span> +
+        <span class="k">this</span>.<span class="i">bread</span> + <span class="s">&quot;, &quot;</span> + <span class="i">who</span> + <span class="s">&quot;.&quot;</span>;
+  }
+
+  <span class="c">// ...</span>
+}
+</pre></div>
+<p>把数据封装在对象里，有一部分是得保证对象在被创建的时候处于一个有效状态。要做到这一点，
+你可以定义一个初始化器。如果你的类里有个叫 <code>init()</code> 的方法，那么对象被构造的时候它会自动
+被调用。传给类的任何参数，都会转发给它的初始化器。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Breakfast</span> {
+  <span class="i">init</span>(<span class="i">meat</span>, <span class="i">bread</span>) {
+    <span class="k">this</span>.<span class="i">meat</span> = <span class="i">meat</span>;
+    <span class="k">this</span>.<span class="i">bread</span> = <span class="i">bread</span>;
+  }
+
+  <span class="c">// ...</span>
+}
+
+<span class="k">var</span> <span class="i">baconAndToast</span> = <span class="t">Breakfast</span>(<span class="s">&quot;bacon&quot;</span>, <span class="s">&quot;toast&quot;</span>);
+<span class="i">baconAndToast</span>.<span class="i">serve</span>(<span class="s">&quot;Dear Reader&quot;</span>);
+<span class="c">// &quot;Enjoy your bacon and toast, Dear Reader.&quot;</span>
+</pre></div>
+<h3><a href="#继承" id="继承"><small>3&#8202;.&#8202;9&#8202;.&#8202;6</small>继承</a></h3>
+<p>每一种面向对象语言都让你不只能定义方法，还能把它们复用到多个类或多个对象上。为此，Lox 支持
+单继承。当你声明一个类时，可以用一个小于号 <span name="less">（<code>&lt;</code>）</span>运算符指定它
+继承自哪个类。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brunch</span> &lt; <span class="t">Breakfast</span> {
+  <span class="i">drink</span>() {
+    <span class="k">print</span> <span class="s">&quot;How about a Bloody Mary?&quot;</span>;
+  }
+}
+</pre></div>
+<aside name="less">
+<p>为什么用 <code>&lt;</code> 运算符？我懒得引入 <code>extends</code> 之类的新关键字。Lox 也没把 <code>:</code> 用在任何别的
+地方，所以我想留着它。于是我学 Ruby 的样，用了 <code>&lt;</code>。</p>
+<p>你要是懂一点类型理论，会发现这<strong>不</strong>是完全随便挑的。子类的每一个实例也是它超类的实例，
+但可能存在不是子类实例的超类实例。那就是说，在对象的宇宙里，子类对象的集合比超类的那个
+集合小，不过类型书呆子们通常用 <code>&lt;:</code> 来表示这个关系。</p>
+</aside>
+<p>在这儿，Brunch 是<strong>派生类</strong>或者说<strong>子类</strong>，Breakfast 是<strong>基类</strong>或者说<strong>超类</strong>。</p>
+<p>超类里定义的每一个方法，对它的子类来说同样可用。</p>
+<div class="codehilite"><pre><span class="k">var</span> <span class="i">benedict</span> = <span class="t">Brunch</span>(<span class="s">&quot;ham&quot;</span>, <span class="s">&quot;English muffin&quot;</span>);
+<span class="i">benedict</span>.<span class="i">serve</span>(<span class="s">&quot;Noble Reader&quot;</span>);
+</pre></div>
+<p>连 <code>init()</code> 方法也会被<span name="init">继承</span>。实践中，子类通常也想定义自己的
+<code>init()</code> 方法。但原先那个也得调用，好让超类维护它自己的状态。我们需要某种办法，能在自己
+的<strong>实例</strong>上调用方法，而不去撞上我们自己的<strong>方法</strong>。</p>
+<aside name="init">
+<p>Lox 在这一点上跟 C++、Java 和 C# 不同——它们不继承构造函数；而是跟 Smalltalk 和 Ruby
+一样——它们继承。</p>
+</aside>
+<p>跟 Java 一样，你用 <code>super</code> 来做这件事。</p>
+<div class="codehilite"><pre><span class="k">class</span> <span class="t">Brunch</span> &lt; <span class="t">Breakfast</span> {
+  <span class="i">init</span>(<span class="i">meat</span>, <span class="i">bread</span>, <span class="i">drink</span>) {
+    <span class="k">super</span>.<span class="i">init</span>(<span class="i">meat</span>, <span class="i">bread</span>);
+    <span class="k">this</span>.<span class="i">drink</span> = <span class="i">drink</span>;
+  }
+}
+</pre></div>
+<p>面向对象差不多就这些。我尽量把这个特性集保持在最小。书的结构还是逼出了妥协的一处。Lox 不是
+一门<strong>纯粹</strong>的面向对象语言。在一门真正的 OOP 语言里，每个对象都是某个类的实例，连数字和
+布尔值这种原始值也是。</p>
+<p>我们很晚才会实现类，而在那之前就已经开始跟内置类型打交道了。要让原始值也变成
+真正的对象，在那个位置很难办。所以原始类型的值，在「是某个类的实例」这个意义上并不是真正
+的对象。它们没有方法，也没有属性。要是我在把 Lox 做成一门给真人用的真语言，我会把这个补上。</p>
+<h2><a href="#标准库" id="标准库"><small>3&#8202;.&#8202;10</small>标准库</a></h2>
+<p>快讲完了。整门语言就这些，所以剩下的只有「核心」库或者「标准」库——就是直接在解释器里
+实现、并且所有用户定义的行为都构建在它上面的那套功能。</p>
+<p>这是 Lox 最让人心酸的部分。它的标准库已经不只是极简主义，简直近乎虚无主义。为了书里
+那些示例代码，我们只需要演示代码确实在跑、也确实在干它该干的事。为了这个，我们已经有内置
+的 <code>print</code> 语句了。</p>
+<p>后来我们开始做优化时，会写一些基准测试，看看执行一段代码要花多久。那意味着我们需要计时，
+所以我们会定义一个内置函数 <code>clock()</code>，返回程序启动以来经过的秒数。</p>
+<p>然后……就没了。我知道，是吧？挺难堪的。</p>
+<p>你要是想把 Lox 变成一门真正有用的语言，你该干的第一件事就是把它充实起来。字符串处理、三角
+函数、文件 I/O、网络、哎呀，甚至<strong>从用户那里读输入</strong>，都会有用。但本书用不上这些，加上
+它们也教不了你什么有意思的，所以我省掉了。</p>
+<p>别担心，语言本身就够我们忙活的了，有大量好玩的东西。</p>
+<div class="challenges">
+<h2><a href="#challenges" id="challenges">习题</a></h2>
+<ol>
+<li>
+<p>写几个 Lox 示例程序并跑起来（你可以用<a href="https://github.com/munificent/craftinginterpreters">我的仓库</a>里的 Lox 实现）。试着想出一些
+我在这儿没规定的边缘情况行为。它做的是你预期的吗？为什么是或不是？</p>
+</li>
+<li>
+<p>这篇非正式的入门留了<strong>大量</strong>没规定的地方。列出几个你对这门语言的语法和语义还存在的
+疑问。你觉得答案应该是什么？</p>
+</li>
+<li>
+<p>Lox 是门相当小的语言。你觉得它还缺哪些特性，缺了会让它拿来写真实程序变得很别扭？
+（当然，标准库不算。）</p>
+</li>
+</ol>
+</div>
+<div class="design-note">
+<h2><a href="#design-note" id="design-note">设计说明：表达式与语句</a></h2>
+<p>Lox 既有表达式，也有语句。有些语言省掉了后者。它们转而把声明和控制流结构也当成表达式。
+这些「一切皆表达式」的语言往往有函数式的血统，包括大多数 Lisp、SML、Haskell、Ruby 和
+CoffeeScript。</p>
+<p>要这么做，你就得为语言里每一个「像语句」的构造决定：求值成什么值。有些很容易：</p>
+<ul>
+<li>
+<p>一个 <code>if</code> 表达式，求值成被选中的那个分支的结果。同理，一个 <code>switch</code> 或者别的多路分支，
+求值成被选中的那一个。</p>
+</li>
+<li>
+<p>一条变量声明，求值成那个变量的值。</p>
+</li>
+<li>
+<p>一个块，求值成序列里最后一个表达式的结果。</p>
+</li>
+</ul>
+<p>有些就有点古怪了。循环该求值成什么？CoffeeScript 里的一个 <code>while</code> 循环，求值成一个数组，
+里面装着循环体每次求值的结果。这有时候很方便，要是你不需要那个数组，就是浪费内存。</p>
+<p>你还得决定，这些像语句的表达式该怎么和其他表达式组合——你得把它们安放进文法的优先级表里。
+举个例子，Ruby 允许这样：</p>
+<div class="codehilite"><pre><span class="i">puts</span> <span class="n">1</span> + <span class="k">if</span> <span class="k">true</span> <span class="k">then</span> <span class="n">2</span> <span class="k">else</span> <span class="n">3</span> <span class="k">end</span> + <span class="n">4</span>
+</pre></div>
+<p>这是你预期的吗？是你的<strong>用户</strong>预期的吗？这会怎么影响你为「语句」设计语法？注意 Ruby 有
+一个显式的 <code>end</code> 来告诉你 <code>if</code> 表达式什么时候结束。没有它的话，<code>+ 4</code> 很可能会被解析成
+<code>else</code> 子句的一部分。</p>
+<p>把每一条语句都变成表达式，会逼你回答一些这样的棘手问题。作为回报，你消除了一些冗余。
+C 既有用块来给语句排序，又用逗号运算符来给表达式排序；既有 <code>if</code> 语句，又有 <code>?:</code> 条件
+运算符。要是 C 里一切都是表达式，你就能把这几样各自统一起来。</p>
+<p>那些取消了语句的语言，通常还会配上一个<strong>隐式返回</strong>——函数不需要什么显式的 <code>return</code> 语法，
+就自动返回它的函数体求值得到的那个值。对小函数和小方法来说，这可真方便。事实上，许多本来
+有语句的语言，也都加上了 <code>=&gt;</code> 这样的语法，好让你能定义「函数体就是单个表达式求值结果」
+的函数。</p>
+<p>但要让<strong>所有</strong>函数都这么工作，就有点怪了。你要是不小心，函数会在你只想让它产生副作用的
+地方也漏出一个返回值。不过实践中，这些语言的用户并不觉得这是个问题。</p>
+<p>对 Lox 来说，我给它留了语句，理由很俗。为了熟悉感我挑了 C 风格的语法，而试图把现成的 C
+语句语法当成表达式来解释，很快就会变得很奇怪。</p>
+</div>
+
+<footer>
+<a href="a-tree-walk-interpreter.html" class="next">
+  下一部分：&ldquo;第一部分 树遍历解释器&rdquo; &rarr;
+</a>
+手雕于 罗伯特·尼斯特罗姆&ensp;&mdash;&ensp;<a href="https://github.com/munificent/craftinginterpreters/blob/master/LICENSE" target="_blank">&copy; 2015&hairsp;&ndash;&hairsp;2021</a>
+</footer>
+</article>
+
+</div>
+</body>
+</html>

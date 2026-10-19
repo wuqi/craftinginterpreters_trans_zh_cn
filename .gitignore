@@ -1,0 +1,15 @@
+# 构建器缓存
+.dart_tool/
+tool/.dart_tool/
+
+# 测试与编译产物
+build/
+*.class
+*.exe
+*.o
+*.obj
+*.dill
+
+# 系统文件
+.DS_Store
+Thumbs.db
